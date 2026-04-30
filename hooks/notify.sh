@@ -44,11 +44,6 @@ fi
 
 set_state() {
     if [ -n "$TMUX" ]; then
-        local PIDFILE="/tmp/claude-spinner-${TMUX_PANE#%}.pid"
-        if [ -f "$PIDFILE" ]; then
-            kill "$(cat "$PIDFILE")" 2>/dev/null
-            rm -f "$PIDFILE"
-        fi
         tmux set-option -w -t "$TMUX_PANE" @claude-state "$1"
         tmux refresh-client -S
     fi
