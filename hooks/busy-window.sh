@@ -21,6 +21,17 @@ LOCKDIR="/tmp/claude-spinner-${TMUX_PANE#%}.lock"
 tmux set-option -w -t "$TMUX_PANE" @claude-state "running" 2>/dev/null
 tmux refresh-client -S 2>/dev/null
 
+# A prompt or tool call is proof the conversation resumed, so release an
+# auto-park right here — the Claude TUI runs on the alternate screen, where
+# output never reaches the stale detector's fingerprint, and a sweep would
+# lag up to a minute behind. The park engine is optional kit; without it this
+# is a no-op. A hand-park (@park=1) is a decision, not an inference, and stays.
+PARK="$HOME/.config/tmux/scripts/tmux-park.sh"
+if [ -x "$PARK" ] && [ "$(tmux show-options -wqv -t "$TMUX_PANE" @park 2>/dev/null)" = "auto" ]; then
+    IFS=$'\t' read -r session window < <(tmux display-message -p -t "$TMUX_PANE" $'#{session_name}\t#{window_id}')
+    "$PARK" unpark "$session" "$window" >/dev/null 2>&1
+fi
+
 # Atomic — loser of the race has nothing left to do.
 mkdir "$LOCKDIR" 2>/dev/null || exit 0
 
