@@ -60,7 +60,10 @@ claude_pane_of_session() {
     [ -n "$want" ] || return 1
     while [ "$hops" -lt 4 ]; do
         while IFS="	" read -r pane stamped; do
-            [ "$stamped" = "$want" ] || continue
+            # A pane accumulates ids: restarting Claude in it, or resuming,
+            # gives the same tab a new conversation while the old one may
+            # still be running work that reports against the old id.
+            case " $stamped " in *" $want "*) ;; *) continue ;; esac
             printf '%s' "$pane"
             return 0
         done <<EOF
@@ -72,4 +75,15 @@ EOF
         hops=$(( hops + 1 ))
     done
     return 1
+}
+
+# Record an id against a pane without losing the ones already there.
+claude_stamp_session() {
+    local pane="$1" sid="$2" have
+    [ -n "$sid" ] || return 1
+    have=$(tmux show-options -pqv -t "$pane" @claude-session 2>/dev/null)
+    case " $have " in
+        *" $sid "*) return 0 ;;
+    esac
+    tmux set-option -p -t "$pane" @claude-session "${have:+$have }$sid" 2>/dev/null
 }

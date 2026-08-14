@@ -32,7 +32,7 @@ case "$1" in
         echo "bind with: $(basename "$0") <session-id>"
         ;;
     *)
-        tmux set-option -p -t "$TMUX_PANE" @claude-session "$1"
-        echo "bound $TMUX_PANE to $1"
+        claude_stamp_session "$TMUX_PANE" "$1"
+        echo "bound $TMUX_PANE to $1 (now: $(tmux show-options -pqv -t "$TMUX_PANE" @claude-session))"
         ;;
 esac

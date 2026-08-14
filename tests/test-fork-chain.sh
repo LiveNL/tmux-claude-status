@@ -27,3 +27,12 @@ check "a fork resolves to the same pane"   "$(claude_pane_of_session "$CHILD"  "
 check "a fork of a fork does too"          "$(claude_pane_of_session "$GRAND"  "$TABLE")" "$PANE"
 check "a fork of nobody stays unresolved"  "$(claude_pane_of_session dddddddd-4444-4444-4444-444444444444 "$TABLE")" ""
 check "an unknown id stays unresolved"     "$(claude_pane_of_session 55555555-5555-5555-5555-555555555555 "$TABLE")" ""
+
+# A pane accumulates ids: restarting Claude in it gives the same tab a new
+# conversation, while work started under the old one is still reporting.
+SECOND=eeeeeeee-5555-5555-5555-555555555555
+claude_stamp_session "$PANE" "$SECOND"
+check "the first id still resolves"  "$(claude_pane_of_session "$PARENT" "$TABLE")" "$PANE"
+check "the second id resolves too"   "$(claude_pane_of_session "$SECOND" "$TABLE")" "$PANE"
+check "stamping twice does not duplicate" \
+      "$(t show-options -pqv -t "$PANE" @claude-session | tr ' ' '\n' | sort | uniq -d | wc -l | tr -d ' ')" "0"

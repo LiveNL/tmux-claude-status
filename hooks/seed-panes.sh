@@ -114,12 +114,11 @@ panes_with_session() {
 # changed: the id is only recomputed when the pane carries none.
 stamp_session() {
     local pane="$1" pid cwd sid
-    [ -n "$(claude_pane_opt @claude-session "$pane")" ] && return 0
     pid=$(claude_pane_claude_pid "$pane") || return 0
     [ -n "$pid" ] || return 0
     cwd=$(tmux display-message -p -t "$pane" '#{pane_current_path}' 2>/dev/null)
     sid=$(claude_session_of_pane "$pid" "$cwd") || return 0
-    [ -n "$sid" ] && tmux set-option -p -t "$pane" @claude-session "$sid" 2>/dev/null
+    [ -n "$sid" ] && claude_stamp_session "$pane" "$sid"
     return 0
 }
 

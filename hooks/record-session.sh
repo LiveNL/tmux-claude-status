@@ -26,7 +26,9 @@ fi
 
 # Pane-scoped, not window-scoped: a split can hold a second conversation, and
 # the snapshot records one row per pane.
-tmux set-option -p -t "$TMUX_PANE" @claude-session "$sid" 2>/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/lib/session-map.sh" 2>/dev/null \
+    && claude_stamp_session "$TMUX_PANE" "$sid" \
+    || tmux set-option -p -t "$TMUX_PANE" @claude-session "$sid" 2>/dev/null
 
 # Cheap and unconditional — the snapshot is written on a timer, and a session
 # that starts and dies inside one interval would otherwise never be recorded.
