@@ -38,6 +38,11 @@ for hook in busy-window.sh continue-window.sh notify.sh permission-window.sh res
     ok "Installed $HOOKS_DEST/$hook"
 done
 
+# Shared state helpers — every hook sources this from its own directory.
+mkdir -p "$HOOKS_DEST/lib"
+cp "$SCRIPT_DIR/hooks/lib/state.sh" "$HOOKS_DEST/lib/state.sh"
+ok "Installed $HOOKS_DEST/lib/state.sh"
+
 # ── Step 2: Merge settings.json ────────────────────────────────────────────
 
 bold "\n2. Configuring Claude Code settings"

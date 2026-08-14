@@ -7,6 +7,8 @@ MESSAGE=$(echo "$NOTIFIER_INPUT" | jq -r '.message // empty')
 EVENT=$(echo "$NOTIFIER_INPUT" | jq -r '.hook_event_name // empty')
 LAST_MSG=$(echo "$NOTIFIER_INPUT" | jq -r '.last_assistant_message // empty')
 
+source "$(dirname "${BASH_SOURCE[0]}")/lib/state.sh"
+
 TMUX_WINDOW=""
 TMUX_SESSION=""
 TMUX_WINDOW_INDEX=""
@@ -43,10 +45,31 @@ if [ "$(uname)" = "Darwin" ] && command -v osascript >/dev/null 2>&1; then
 fi
 
 set_state() {
-    if [ -n "$TMUX" ]; then
-        tmux set-option -w -t "$TMUX_PANE" @claude-state "$1"
-        tmux refresh-client -S
-    fi
+    claude_set_state "$1"
+}
+
+# Claude sends the same "needs your attention" Notification whether it is
+# blocked on you or merely slow, so the message alone cannot be trusted to
+# retire a run: taking it at face value flipped a busy tab to amber mid-run
+# and killed its spinner. Decide from what the pane was last seen doing.
+awaiting_user() {
+    local phase tool beat age
+    # Not running: Stop already had its say, so the event is about an idle
+    # session and can be believed.
+    [ "$(claude_pane_state)" = "running" ] || return 0
+
+    phase=$(claude_pane_opt @claude-pane-phase)
+    tool=$(claude_pane_opt @claude-pane-tool)
+    # A question tool is in flight — Claude really is parked on an answer.
+    case "$phase:$tool" in
+        tool-start:AskUserQuestion|tool-start:ExitPlanMode) return 0 ;;
+    esac
+
+    # Otherwise only stalled work counts. A live run stamps a beat on every
+    # tool boundary; five quiet minutes means the run is no longer moving.
+    beat=$(claude_pane_opt @claude-pane-beat)
+    age=$(( $(date +%s) - ${beat:-0} ))
+    [ "$age" -ge 300 ]
 }
 
 # Args: event_label msg sound
@@ -93,7 +116,15 @@ notify_macos() {
 }
 
 if [ -n "$TMUX" ] && [ "${DEBUG_CLAUDE_HOOKS:-0}" = "1" ]; then
-    echo "$(date '+%H:%M:%S') event=$EVENT state=$(tmux display-message -t "$TMUX_PANE" -p '#{@claude-state}' 2>/dev/null) msg=${MESSAGE:-$LAST_MSG}" >> /tmp/claude-notify.log
+    DBG_BEAT=$(claude_pane_opt @claude-pane-beat)
+    printf '%s event=%s pane=%s state=%s window=%s phase=%s tool=%s beat=%ss msg=%s\n' \
+        "$(date '+%H:%M:%S')" "$EVENT" "$TMUX_PANE" \
+        "$(claude_pane_state)" \
+        "$(tmux display-message -t "$TMUX_PANE" -p '#{@claude-state}' 2>/dev/null)" \
+        "$(claude_pane_opt @claude-pane-phase)" \
+        "$(claude_pane_opt @claude-pane-tool)" \
+        "$(( $(date +%s) - ${DBG_BEAT:-0} ))" \
+        "${MESSAGE:-$LAST_MSG}" >> /tmp/claude-notify.log 2>/dev/null
 fi
 
 if [ -z "$EVENT" ]; then
@@ -103,6 +134,7 @@ if [ -z "$EVENT" ]; then
 fi
 
 if [ "$EVENT" = "Stop" ]; then
+    claude_mark_activity "stop" ""
     PREVIEW=$(preview "$LAST_MSG")
     if echo "$LAST_MSG" | grep -q '?$'; then
         set_state "input"
@@ -117,15 +149,18 @@ if [ "$EVENT" = "Stop" ]; then
     fi
 elif [ "$EVENT" = "Notification" ]; then
     if echo "$MESSAGE" | grep -qi "permission"; then
+        # PermissionRequest normally paints the tab first, but that event is
+        # newer than this one — set it here too so older clients still turn red.
+        set_state "permission"
         CMD=$(echo "$MESSAGE" | sed 's/.*[Rr]un[: ]\{1,3\}//' | sed 's/  */ /g; s/^ *//; s/ *$//' | cut -c1-60)
         if [ -n "$CMD" ] && [ "$CMD" != "$MESSAGE" ]; then
             notify_macos "🔑 Permission" "Run: $CMD" "Sosumi"
         else
             notify_macos "🔑 Permission" "${MESSAGE:-Needs your approval}" "Sosumi"
         fi
-    else
-        CURRENT_STATE=$(tmux display-message -t "$TMUX_PANE" -p '#{@claude-state}' 2>/dev/null)
-        if [ "$CURRENT_STATE" != "done" ] && [ "$CURRENT_STATE" != "input" ]; then
+    elif awaiting_user; then
+        # Never downgrade a pending permission: approval outranks input.
+        if [ "$(claude_pane_state)" != "permission" ]; then
             set_state "input"
         fi
         if [ "$IS_ACTIVE" != "1" ]; then

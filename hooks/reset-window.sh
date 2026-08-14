@@ -1,7 +1,13 @@
 #!/bin/bash
 # Fired on SessionStart.
 
+# Drain stdin first: Claude pipes the payload in and holds the write end open
+# until it is consumed.
+cat >/dev/null 2>&1
+
 [ -n "$TMUX" ] || exit 0
+
+source "$(dirname "${BASH_SOURCE[0]}")/lib/state.sh"
 
 LOCKDIR="/tmp/claude-spinner-${TMUX_PANE#%}.lock"
 
@@ -15,6 +21,8 @@ if [ -d "$LOCKDIR" ]; then
     fi
 fi
 
-tmux set-option -w -t "$TMUX_PANE" @claude-state ""
+# Clear this pane only. A sibling pane running its own session keeps its
+# state, and the window indicator falls back to whatever that one is doing.
+claude_clear_pane
 tmux set-option -w -t "$TMUX_PANE" @claude-spinner "⬢"
 tmux refresh-client -S

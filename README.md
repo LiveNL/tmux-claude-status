@@ -74,17 +74,21 @@ Copy the `#{?...}` fragment from `tmux/claude-state-prefix.txt` to the start of 
 
 ## How it works
 
-Claude Code fires hook scripts at exact lifecycle transitions. Each script sets a window-scoped tmux variable (`@claude-state`), which the status-bar format reads to render the right glyph — no polling, just tmux variable reads on each status-bar refresh.
+Claude Code fires hook scripts at exact lifecycle transitions. Each script records the state on its own pane (`@claude-pane-state`) and then republishes the window-scoped `@claude-state` that the status-bar format reads — no polling, just tmux variable reads on each status-bar refresh.
 
 ```
-UserPromptSubmit / PreToolUse  →  busy-window.sh       →  @claude-state = "running"  + spinner loop starts
-PostToolUse                    →  continue-window.sh   →  @claude-state = "running"  (restores after permission grant)
-PermissionRequest              →  permission-window.sh →  @claude-state = "permission"
-Stop / Notification            →  notify.sh            →  @claude-state = "input" | "done"
-SessionStart                   →  reset-window.sh      →  @claude-state = ""          + spinner loop stops
+UserPromptSubmit / PreToolUse  →  busy-window.sh       →  state = "running"  + spinner loop starts
+PostToolUse                    →  continue-window.sh   →  state = "running"  (restores after permission grant)
+PermissionRequest              →  permission-window.sh →  state = "permission"
+Stop / Notification            →  notify.sh            →  state = "input" | "done"
+SessionStart                   →  reset-window.sh      →  state = ""          + spinner loop stops
 ```
 
-The animated spinner is a lightweight background process that writes a new frame to `@claude-spinner` each second and is killed the moment Claude stops. Because `@claude-state` is window-scoped, every tmux window tracks its own Claude session independently — run as many sessions in parallel as you like.
+The window shows the highest-priority state of any pane in it — `permission` > `running` > `input` > `done` > idle. Split a window between two Claude sessions and neither can overwrite the other's indicator; close one and its state leaves with its pane.
+
+Not every event can be taken at face value. Claude sends the same "waiting for your input" notification whether it is genuinely blocked on you or merely slow, so `notify.sh` weighs it against what the pane was last seen doing: a run mid-tool keeps spinning, and only a pending question tool or five silent minutes retires it. Permission requests always win.
+
+The animated spinner is a lightweight background process that writes a new frame to `@claude-spinner` twice a second and exits the moment the pane leaves `running`. One spinner per pane is guaranteed by an atomic lock directory; it gives up after four hours and clears the state, so a crashed session can't strand a half-lit glyph on the tab.
 
 ## Customization
 
