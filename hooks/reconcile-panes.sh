@@ -132,15 +132,12 @@ while IFS= read -r pane; do
             ;;
     esac
 
-    # A live spinner means the hooks currently believe this pane is working,
-    # and they see tool boundaries the screen does not. Never let a screen
-    # reading retire a run they are still tracking.
-    if [ "$have" = "running" ] && [ "$want" != "permission" ] \
-       && [ -d "/tmp/claude-spinner-${pane#%}.lock" ]; then
-        printf 'keep    %-16s %-5s running (spinner alive)\n' "$win" "$pane"
-        kept=$(( kept + 1 ))
-        continue
-    fi
+    # A live spinner used to veto any downgrade here, on the reasoning that
+    # hooks see tool boundaries the screen does not. It made "running" a state
+    # nothing could leave: the spinner runs *because* the state says running,
+    # so the veto kept alive precisely the condition it was reading as proof.
+    # The hook-freshness gate above is the honest version of that idea — it
+    # asks whether a hook actually reported something recently.
 
     if [ "$have" = "$want" ]; then
         printf 'keep    %-16s %-5s %s\n' "$win" "$pane" "$want"
