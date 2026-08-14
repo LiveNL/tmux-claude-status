@@ -43,6 +43,11 @@ mkdir -p "$HOOKS_DEST/lib"
 cp "$SCRIPT_DIR/hooks/lib/state.sh" "$HOOKS_DEST/lib/state.sh"
 ok "Installed $HOOKS_DEST/lib/state.sh"
 
+# Repair tool — not wired to an event, run by hand or from a restore script.
+cp "$SCRIPT_DIR/hooks/reconcile-panes.sh" "$HOOKS_DEST/reconcile-panes.sh"
+chmod +x "$HOOKS_DEST/reconcile-panes.sh"
+ok "Installed $HOOKS_DEST/reconcile-panes.sh"
+
 # ── Step 2: Merge settings.json ────────────────────────────────────────────
 
 bold "\n2. Configuring Claude Code settings"
