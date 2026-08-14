@@ -98,23 +98,26 @@ The animated spinner is a lightweight background process that writes a new frame
 
 **Colors:** Edit `tmux/claude-state.conf` and replace the named colors (`cyan`, `yellow`, `red`, `green`) with your theme's values (e.g. `colour14`, `#fabd2f`).
 
-**Spinner frames:** Edit the `frames=(⬢ ⬡)` array in `hooks/busy-window.sh` — any Unicode glyphs work.
+**Spinner frames:** Edit the `frames=(⬢ ⬡)` array in `hooks/lib/state.sh` — any Unicode glyphs work.
 
 **Clickable notifications:** Install `alerter` (`brew install vjeantet/tap/alerter`). When present, clicking a notification focuses your terminal and switches to the right tmux window automatically.
 
 **Desktop notifications:** Set `CAN_NOTIFY="0"` near the top of `hooks/notify.sh` to disable, or swap `notify_macos` for `notify-send`/`paplay` for Linux.
 
-**Debug logging:** Set `DEBUG_CLAUDE_HOOKS=1` in your environment to log hook events to `/tmp/claude-notify.log`.
+**Debug logging:** Set `DEBUG_CLAUDE_HOOKS=1` to log hook decisions to `/tmp/claude-notify.log`. Separately, `touch /tmp/claude-hook-env.log` makes every hook record the pane and ancestry it was fired with — that is how sessions firing without a pane were found. Delete the file to switch it off.
+
+**Tests:** `bash tests/run-all.sh` runs each suite against its own throwaway tmux server.
 
 ## Uninstall
 
 ```bash
-rm ~/.claude/hooks/busy-window.sh \
-   ~/.claude/hooks/continue-window.sh \
-   ~/.claude/hooks/notify.sh \
-   ~/.claude/hooks/permission-window.sh \
-   ~/.claude/hooks/reset-window.sh \
-   ~/.claude/hooks/spinner.sh
+rm -r ~/.claude/hooks/busy-window.sh \
+      ~/.claude/hooks/continue-window.sh \
+      ~/.claude/hooks/notify.sh \
+      ~/.claude/hooks/permission-window.sh \
+      ~/.claude/hooks/reset-window.sh \
+      ~/.claude/hooks/seed-panes.sh \
+      ~/.claude/hooks/lib
 ```
 
 Then remove the `hooks` block from `~/.claude/settings.json` and the `source-file` line from `~/.tmux.conf`.
