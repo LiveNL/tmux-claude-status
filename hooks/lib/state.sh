@@ -89,6 +89,40 @@ EOF
             esac
         done
         hit=$(claude_pick_one "$narrowed")
+        candidates="${narrowed:-$candidates}"
+    fi
+
+    # Last resort: several conversations in one checkout is normal — a monorepo
+    # with a window per topic leaves five identical candidates. What separates
+    # them is what each one says, and Stop carries the reply Claude just
+    # printed. Score candidates on how many of its distinctive words are on
+    # their screen; a clear winner is the pane that printed it.
+    if [ -z "$hit" ] && [ -n "$payload" ]; then
+        local msg words word screen score best="" best_score=0 runner=0
+        msg=$(printf '%s' "$payload" | jq -r '.last_assistant_message // empty' 2>/dev/null)
+        [ -n "$msg" ] || msg=$(printf '%s' "$payload" |
+            sed -n 's/.*"last_assistant_message"[[:space:]]*:[[:space:]]*"\([^"]\{20,\}\)".*/\1/p')
+        words=$(printf '%s' "$msg" | tr -cs '[:alnum:]' '\n' | awk 'length($0) >= 6' | head -12)
+
+        if [ -n "$words" ]; then
+            for pane in $candidates; do
+                screen=$(tmux capture-pane -p -t "$pane" 2>/dev/null)
+                score=0
+                for word in $words; do
+                    case "$screen" in *"$word"*) score=$(( score + 1 )) ;; esac
+                done
+                if [ "$score" -gt "$best_score" ]; then
+                    runner="$best_score"
+                    best_score="$score"
+                    best="$pane"
+                elif [ "$score" -gt "$runner" ]; then
+                    runner="$score"
+                fi
+            done
+            # Needs to be both convincing and clearly ahead of the next pane,
+            # otherwise two windows discussing the same work would trade tabs.
+            [ "$best_score" -ge 3 ] && [ "$best_score" -gt "$runner" ] && hit="$best"
+        fi
     fi
     [ -n "$hit" ] || return 1
 
