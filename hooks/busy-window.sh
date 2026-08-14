@@ -16,9 +16,16 @@
 
 payload=$(cat 2>/dev/null)
 
-[ -n "$TMUX" ] || exit 0
+# Env probe: a session was seen running these hooks while none of its tmux
+# writes landed. Logs only while the file exists — delete it to switch off.
+[ -f /tmp/claude-hook-env.log ] && \
+    printf '%s busy   pane=%s tmux=%s ppid=%s cwd=%s\n' "$(date +%H:%M:%S)" "${TMUX_PANE:-UNSET}" "${TMUX:-UNSET}" "$PPID" "$PWD" \
+    >> /tmp/claude-hook-env.log
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/state.sh"
+
+# Resolves TMUX/TMUX_PANE when the session fired this with a scrubbed env.
+claude_bootstrap "$payload" || exit 0
 
 LOCKDIR="/tmp/claude-spinner-${TMUX_PANE#%}.lock"
 

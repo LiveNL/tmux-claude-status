@@ -2,12 +2,20 @@
 # Fired on Stop and Notification events.
 # Updates the tmux window state and sends a desktop notification (macOS only).
 
+# Env probe: a session was seen running this hook while none of its tmux
+# writes landed. Logs only while the file exists — delete it to switch off.
+[ -f /tmp/claude-hook-env.log ] && \
+    printf '%s notify pane=%s tmux=%s ppid=%s cwd=%s\n' "$(date +%H:%M:%S)" "${TMUX_PANE:-UNSET}" "${TMUX:-UNSET}" "$PPID" "$PWD" \
+    >> /tmp/claude-hook-env.log
+
 NOTIFIER_INPUT=$(cat)
 MESSAGE=$(echo "$NOTIFIER_INPUT" | jq -r '.message // empty')
 EVENT=$(echo "$NOTIFIER_INPUT" | jq -r '.hook_event_name // empty')
 LAST_MSG=$(echo "$NOTIFIER_INPUT" | jq -r '.last_assistant_message // empty')
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/state.sh"
+
+claude_bootstrap "$NOTIFIER_INPUT" || exit 0
 
 TMUX_WINDOW=""
 TMUX_SESSION=""

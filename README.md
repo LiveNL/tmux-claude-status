@@ -88,6 +88,8 @@ The window shows the highest-priority state of any pane in it — `permission` >
 
 Not every event can be taken at face value. Claude sends the same "waiting for your input" notification whether it is genuinely blocked on you or merely slow, so `notify.sh` weighs it against what the pane was last seen doing: a run mid-tool keeps spinning, and only a pending question tool or five silent minutes retires it. Permission requests always win.
 
+A hook is normally handed `TMUX` and `TMUX_PANE` by the session firing it, but not always — a resumed session, or one driven from outside the terminal, runs its hooks without them, and every tmux write then lands nowhere while the hook still reports success. The scripts recover from that by looking the pane up by session id (stamped at SessionStart), falling back to the working directory when exactly one pane matches.
+
 Hooks only fire while a session is being driven, so a tab can still fall out of step — a tmux server restart, a restored session, a session that predates the install. `hooks/reconcile-panes.sh` repairs those: it reads each pane's Claude TUI and writes the state that matches what is on screen. Run it by hand, bind it to a key, or call it from your restore script; `--dry-run` reports without writing.
 
 The animated spinner is a lightweight background process that writes a new frame to `@claude-spinner` twice a second and exits the moment the pane leaves `running`. One spinner per pane is guaranteed by an atomic lock directory; it gives up after four hours and clears the state, so a crashed session can't strand a half-lit glyph on the tab.

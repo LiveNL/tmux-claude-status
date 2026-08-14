@@ -10,6 +10,64 @@
 #
 # Priority: permission > running > input > done > idle.
 
+# Hooks are meant to inherit TMUX and TMUX_PANE from the session firing them,
+# and most do. Some do not: a session that was resumed, or is being driven
+# from outside the terminal, runs its hooks with those variables missing, and
+# then every write in this file targets nothing at all while the hook still
+# reports success. Recover the pane instead of giving up on it.
+#
+# The session id is the reliable handle — record-session.sh stamps it onto the
+# pane at SessionStart — with the working directory as a fallback, and only
+# when it identifies exactly one pane. Re-stamp whatever is found so the next
+# hook resolves directly.
+#
+# Returns non-zero when no pane can be identified; callers should exit.
+claude_bootstrap() {
+    local payload="$1" sid pane stamped cwd hit=""
+
+    if [ -z "$TMUX" ]; then
+        TMUX=$(tmux display-message -p '#{socket_path},0,0' 2>/dev/null) || return 1
+        export TMUX
+    fi
+
+    if [ -n "$TMUX_PANE" ] && tmux display-message -t "$TMUX_PANE" -p '' >/dev/null 2>&1; then
+        return 0
+    fi
+
+    sid=$(printf '%s' "$payload" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+    if [ -n "$sid" ]; then
+        while IFS="	" read -r pane stamped; do
+            [ "$stamped" = "$sid" ] || continue
+            TMUX_PANE="$pane"
+            export TMUX_PANE
+            return 0
+        done <<EOF
+$(tmux list-panes -a -F '#{pane_id}	#{@claude-session}' 2>/dev/null)
+EOF
+    fi
+
+    # Directory fallback. Two conversations in one checkout are indistinguishable
+    # this way, so an ambiguous match is treated as no match — a blank tab beats
+    # a confidently wrong one, and the reconciler still repairs it from screen.
+    # tmux reports the physical path, so resolve ours the same way — on macOS
+    # $PWD is routinely a symlink (/tmp, /var) and would never compare equal.
+    local here
+    here=$(pwd -P 2>/dev/null) || here="$PWD"
+    while IFS="	" read -r pane cwd; do
+        [ "$cwd" = "$here" ] || continue
+        [ -n "$hit" ] && return 1
+        hit="$pane"
+    done <<EOF
+$(tmux list-panes -a -F '#{pane_id}	#{pane_current_path}' 2>/dev/null)
+EOF
+    [ -n "$hit" ] || return 1
+
+    TMUX_PANE="$hit"
+    export TMUX_PANE
+    [ -n "$sid" ] && tmux set-option -p -t "$TMUX_PANE" @claude-session "$sid" 2>/dev/null
+    return 0
+}
+
 claude_state_rank() {
     case "$1" in
         permission) echo 4 ;;

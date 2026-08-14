@@ -3,11 +3,11 @@
 
 # Drain stdin first: Claude pipes the payload in and holds the write end open
 # until it is consumed.
-cat >/dev/null 2>&1
-
-[ -n "$TMUX" ] || exit 0
+payload=$(cat 2>/dev/null)
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/state.sh"
+
+claude_bootstrap "$payload" || exit 0
 
 LOCKDIR="/tmp/claude-spinner-${TMUX_PANE#%}.lock"
 
