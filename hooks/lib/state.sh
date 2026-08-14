@@ -126,6 +126,52 @@ claude_mark_activity() {
     tmux set-option -p -t "$TMUX_PANE" @claude-pane-beat "$(date +%s)" 2>/dev/null
 }
 
+# Animate the tab for as long as this pane keeps working.
+#
+# Parallel tool calls fire hooks concurrently. A read-then-write pidfile loses
+# that race and leaks an immortal spinner per call, each forking tmux 3x/sec —
+# enough to wedge the single-threaded tmux server overnight. The lock directory
+# is created atomically, so exactly one spinner per pane can ever exist and
+# every loser simply returns.
+claude_start_spinner() {
+    local pane="${1:-$TMUX_PANE}" lock
+    lock="/tmp/claude-spinner-${pane#%}.lock"
+
+    mkdir "$lock" 2>/dev/null || return 0
+    tmux set-option -w -t "$pane" @claude-spinner "⬢" 2>/dev/null
+
+    (
+        # Cleanup hangs off EXIT only. A trap on TERM would run the handler and
+        # then *resume* the loop, making the spinner unkillable by anything but
+        # SIGKILL — so the signal traps exit, which fires the EXIT trap in turn.
+        trap 'rm -rf "$lock" 2>/dev/null' EXIT
+        trap 'exit 0' INT TERM HUP
+        local frames=("⬢" "⬡") i=0 n state
+        # Backstop of 4 hours in case the state ever wedges on "running". The
+        # old 30-minute cap was shorter than real agent runs, so the loop kept
+        # quitting under a live session and froze the tab on a half-lit glyph.
+        for (( n = 0; n < 28800; n++ )); do
+            sleep 0.5
+            # An empty read also covers a pane that has since been closed.
+            state=$(tmux show-options -pqv -t "$pane" @claude-pane-state 2>/dev/null)
+            case "$state" in
+                running|permission) ;;
+                *) exit 0 ;;
+            esac
+            i=$(( 1 - i ))
+            tmux set-option -w -t "$pane" @claude-spinner "${frames[$i]}" 2>/dev/null
+            tmux refresh-client -S 2>/dev/null
+        done
+        # Cap reached with the state still running: nothing is coming back for
+        # this pane. Clear it so the tab drops to idle instead of freezing.
+        TMUX_PANE="$pane" claude_clear_pane
+    ) </dev/null >/dev/null 2>&1 &
+
+    echo $! > "$lock/pid" 2>/dev/null
+    disown 2>/dev/null
+    return 0
+}
+
 claude_clear_pane() {
     [ -n "$TMUX" ] || return 0
     local opt

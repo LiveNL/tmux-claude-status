@@ -70,45 +70,6 @@ if [ -x "$PARK" ]; then
     fi
 fi
 
-# Atomic — loser of the race has nothing left to do.
-mkdir "$LOCKDIR" 2>/dev/null || exit 0
-
-tmux set-option -w -t "$TMUX_PANE" @claude-spinner "⬢" 2>/dev/null
-
-pane="$TMUX_PANE"
-lock="$LOCKDIR"
-
-(
-    # Cleanup hangs off EXIT only. A trap on TERM would run the handler and
-    # then *resume* the loop, making the spinner unkillable by anything but
-    # SIGKILL — so the signal traps exit, which fires the EXIT trap in turn.
-    trap 'rm -rf "$lock" 2>/dev/null' EXIT
-    trap 'exit 0' INT TERM HUP
-    frames=("⬢" "⬡")
-    i=0
-    # Backstop of 4 hours in case the state option ever wedges on "running".
-    # The old 30-minute cap was shorter than real agent runs, so the loop kept
-    # quitting under a live session: the tab froze on a half-lit glyph that no
-    # longer animated while the state still read "running".
-    for (( n = 0; n < 28800; n++ )); do
-        sleep 0.5
-        # An empty read also covers a pane that has since been closed.
-        state=$(tmux show-options -pqv -t "$pane" @claude-pane-state 2>/dev/null)
-        case "$state" in
-            running|permission) ;;
-            *) exit 0 ;;
-        esac
-        i=$(( 1 - i ))
-        tmux set-option -w -t "$pane" @claude-spinner "${frames[$i]}" 2>/dev/null
-        tmux refresh-client -S 2>/dev/null
-    done
-    # Cap reached with the state still "running": nothing is coming back for
-    # this pane (killed client, crashed session). Clear it so the tab drops to
-    # idle instead of freezing mid-spin forever.
-    claude_clear_pane
-) </dev/null >/dev/null 2>&1 &
-
-echo $! > "$LOCKDIR/pid" 2>/dev/null
-disown
+claude_start_spinner "$TMUX_PANE"
 
 exit 0

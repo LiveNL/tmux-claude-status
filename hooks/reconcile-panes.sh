@@ -23,6 +23,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/state.sh"
 DRY=""
 WATCH=""
 INTERVAL="${2:-3}"
+# Seconds a hook fingerprint stays authoritative. Long enough to cover a slow
+# tool call or a stop hook that takes its time, short enough that a session
+# whose hooks never land is picked up while you are still looking at the tab.
+GRACE="${CLAUDE_RECONCILE_GRACE:-90}"
 case "$1" in
     --dry-run|-n) DRY=1 ;;
     --watch|-w)   WATCH=1 ;;
@@ -93,24 +97,40 @@ while IFS= read -r pane; do
     case "$tail" in
         *"esc to interrupt"*|*"ctrl+b to run in background"*) want="running" ;;
     esac
-    if [ "$want" = "input" ] && echo "$tail" | grep -qE "…\s*\([0-9]+[ms]|↓ [0-9.]+k tokens"; then
+    # The working line is "<glyph> <Word>… (<detail>)" and the detail varies
+    # wildly: an elapsed clock, a token count with or without the k, or a note
+    # that a hook is still running. Anchor on the ellipsis-then-paren shape
+    # instead of the detail, and keep the token counter as a second opinion.
+    # A finished turn reads "✻ Sautéed for 13s" — no ellipsis, no parenthesis,
+    # so it stays out.
+    if [ "$want" = "input" ] && echo "$tail" | grep -qE "…[[:space:]]*\(|↓ [0-9.]+k? tokens"; then
         want="running"
     fi
     case "$tail" in
         *"Do you want "*|*"❯ 1. Yes"*) want="permission" ;;
     esac
 
-    # A run is proved by a live spinner, not by a glyph. Without one, only a
-    # fresh fingerprint makes "running" credible — otherwise this is a idle
-    # session wearing a stale working line, and calling it running would
-    # freeze the tab there until the session is next driven.
-    if [ "$want" = "running" ] && [ ! -d "/tmp/claude-spinner-${pane#%}.lock" ]; then
-        beat=$(claude_pane_opt @claude-pane-beat "$pane")
-        [ $(( $(date +%s) - ${beat:-0} )) -gt 120 ] && want="input"
-    fi
-
     have=$(claude_pane_state "$pane")
     win=$(tmux display-message -p -t "$pane" '#{session_name}:#{window_index}')
+
+    # Hooks outrank this. They are told what happened; reading a screen is
+    # guesswork against a TUI that can restyle itself at any release, so it
+    # must never overrule a session whose hooks are demonstrably landing.
+    # A fingerprint younger than the grace period is that proof, and it makes
+    # the screen reader what it should be: a fallback for sessions whose hooks
+    # are missing, disabled, or firing into a scrubbed environment.
+    beat=$(claude_pane_opt @claude-pane-beat "$pane")
+    phase=$(claude_pane_opt @claude-pane-phase "$pane")
+    case "$phase" in
+        seed|reconcile|"") ;;   # never came from a hook — no proof of anything
+        *)
+            if [ $(( $(date +%s) - ${beat:-0} )) -lt "$GRACE" ]; then
+                printf 'keep    %-16s %-5s %s (hooks live)\n' "$win" "$pane" "${have:--}"
+                kept=$(( kept + 1 ))
+                continue
+            fi
+            ;;
+    esac
 
     # A live spinner means the hooks currently believe this pane is working,
     # and they see tool boundaries the screen does not. Never let a screen
@@ -133,6 +153,9 @@ while IFS= read -r pane; do
     [ -n "$DRY" ] && continue
 
     TMUX_PANE="$pane" claude_set_state "$want"
+    # A tab that says running must also animate; without a hook-spawned
+    # spinner it would sit on a dead glyph.
+    [ "$want" = "running" ] && claude_start_spinner "$pane"
     # Only stamp the fingerprint when there is none: a real hook's timestamp
     # is better evidence than this one, and notify.sh reads it to decide
     # whether a run has stalled.
