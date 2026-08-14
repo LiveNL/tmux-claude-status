@@ -188,10 +188,14 @@ elif [ "$EVENT" = "Notification" ]; then
             notify_macos "🔑 Permission" "${MESSAGE:-Needs your approval}" "Sosumi"
         fi
     elif awaiting_user; then
-        # Never downgrade a pending permission: approval outranks input.
-        if [ "$(claude_pane_state)" != "permission" ]; then
-            set_state "input"
-        fi
+        # Both "done" and "input" mean your turn, and "done" is the more
+        # precise of the two — it says the turn ended without a question. The
+        # idle notification that arrives a minute later must not overwrite it,
+        # or every finished tab quietly turns back into a question mark.
+        case "$(claude_pane_state)" in
+            permission|done) ;;
+            *) set_state "input" ;;
+        esac
         if [ "$IS_ACTIVE" != "1" ]; then
             notify_macos "💬 Input needed" "${MESSAGE:-Claude needs your attention}" "Pop"
         fi

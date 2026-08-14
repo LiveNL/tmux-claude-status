@@ -11,7 +11,6 @@ export DEBUG_CLAUDE_HOOKS=1
 LOG=/tmp/claude-notify-test.log
 rm -f "$LOG"
 
-t kill-session -t notifytest 2>/dev/null
 t new-session -d -s notifytest -x 80 -y 24
 WIN=$(t list-windows -t notifytest -F '#{window_id}' | head -1)
 P=$(t list-panes -t "$WIN" -F '#{pane_id}' | head -1)
@@ -67,4 +66,13 @@ echo "-- debug log --"
 cp /tmp/claude-notify.log "$LOG" 2>/dev/null
 tail -4 "$LOG" 2>/dev/null | cut -c1-150
 
-t kill-session -t notifytest 2>/dev/null
+
+# A finished turn keeps its verdict. Claude nudges with an idle notification a
+# minute later, and taking that at face value turned every green tab amber.
+setup done stop "" 90
+fire Notification "Claude is waiting for your input"
+check "done survives the idle notification" "done"
+
+setup input stop "" 90
+fire Notification "Claude is waiting for your input"
+check "input stays input" "input"
