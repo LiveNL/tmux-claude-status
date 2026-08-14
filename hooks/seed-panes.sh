@@ -44,9 +44,18 @@ if [ -z "$TMUX" ]; then
 fi
 
 if [ -n "$WATCH" ]; then
-    LOCK=/tmp/claude-seed-panes.lock
+    LOCK="${CLAUDE_SEED_LOCK:-/tmp/claude-seed-panes.lock}"
     if ! mkdir "$LOCK" 2>/dev/null; then
-        pid=$(cat "$LOCK/pid" 2>/dev/null)
+        # The owner writes its pid just after creating the directory, so an
+        # empty pid file means "started moments ago", not "died". Reading it
+        # once and calling it stale let a second watcher delete a live lock
+        # and start alongside the first.
+        pid=""
+        for _ in 1 2 3 4 5; do
+            pid=$(cat "$LOCK/pid" 2>/dev/null)
+            [ -n "$pid" ] && break
+            sleep 0.2
+        done
         if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
             echo "watcher already running (pid $pid)"
             exit 0
