@@ -92,6 +92,8 @@ A hook may only touch a tab when it can name its pane with certainty, and `TMUX_
 
 That leaves two gaps hooks cannot fill, both answered from the process table rather than by guessing. `hooks/seed-panes.sh` gives an indicator to any pane whose process tree holds a live Claude session but has no state yet — a session that has not fired an event since it started is waiting on you — and clears panes whose session has exited. It never overrules a state a hook has set. Run it from tmux on a timer plus the events where a pane gains or loses a session; `--dry-run` reports without writing.
 
+`hooks/link-pane.sh <session-id>` binds a pane to a conversation by hand, for the case below; `--guess` lists the conversations of that pane's project, `--clear` undoes it. Anything that conversation forks is then followed to the same tab.
+
 One case cannot be linked from outside. A conversation started with no arguments can end up hosted inside Claude's daemon, with the pane holding only a client attached to it; the session id then appears in no process argument, environment or open file that a pane can be matched against. `seed-panes.sh` names those panes as `unlinked` — their tab still shows that a session is present, but it cannot follow what that session is doing. Starting the conversation in the pane (as `claude --resume <id>` does) is what makes its hooks carry the pane.
 
 The animated spinner is a lightweight background process that writes a new frame to `@claude-spinner` twice a second and exits the moment the pane leaves `running`. One spinner per pane is guaranteed by an atomic lock directory; it gives up after four hours and clears the state, so a crashed session can't strand a half-lit glyph on the tab.

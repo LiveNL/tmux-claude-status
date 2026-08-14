@@ -44,9 +44,11 @@ cp "$SCRIPT_DIR/hooks/lib/state.sh" "$HOOKS_DEST/lib/state.sh"
 ok "Installed $HOOKS_DEST/lib/state.sh"
 
 # Seeder — not wired to an event; run from tmux at startup or by hand.
-cp "$SCRIPT_DIR/hooks/seed-panes.sh" "$HOOKS_DEST/seed-panes.sh"
-chmod +x "$HOOKS_DEST/seed-panes.sh"
-ok "Installed $HOOKS_DEST/seed-panes.sh"
+for tool in seed-panes.sh link-pane.sh; do
+    cp "$SCRIPT_DIR/hooks/$tool" "$HOOKS_DEST/$tool"
+    chmod +x "$HOOKS_DEST/$tool"
+    ok "Installed $HOOKS_DEST/$tool"
+done
 
 # ── Step 2: Merge settings.json ────────────────────────────────────────────
 
