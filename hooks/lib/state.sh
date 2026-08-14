@@ -46,20 +46,50 @@ $(tmux list-panes -a -F '#{pane_id}	#{@claude-session}' 2>/dev/null)
 EOF
     fi
 
-    # Directory fallback. Two conversations in one checkout are indistinguishable
-    # this way, so an ambiguous match is treated as no match — a blank tab beats
-    # a confidently wrong one, and the reconciler still repairs it from screen.
+    # Directory fallback. A window usually holds the conversation plus an
+    # editor or shell in the same checkout, so matching on the path alone is
+    # ambiguous more often than not. Narrow it in two steps before giving up:
+    # panes that have ever recorded a session id, then panes actually showing
+    # a Claude TUI. Two live conversations in one checkout remain genuinely
+    # indistinguishable, and there a blank tab beats a confidently wrong one —
+    # the reconciler still repairs those from the screen.
     # tmux reports the physical path, so resolve ours the same way — on macOS
     # $PWD is routinely a symlink (/tmp, /var) and would never compare equal.
-    local here
+    local here candidates="" narrowed=""
     here=$(pwd -P 2>/dev/null) || here="$PWD"
     while IFS="	" read -r pane cwd; do
         [ "$cwd" = "$here" ] || continue
-        [ -n "$hit" ] && return 1
-        hit="$pane"
+        candidates="$candidates $pane"
     done <<EOF
 $(tmux list-panes -a -F '#{pane_id}	#{pane_current_path}' 2>/dev/null)
 EOF
+
+    claude_pick_one() {  # prints the single survivor, or nothing
+        local list="$1" p keep="" count=0
+        for p in $list; do
+            keep="$p"
+            count=$(( count + 1 ))
+        done
+        [ "$count" -eq 1 ] && printf '%s' "$keep"
+    }
+
+    hit=$(claude_pick_one "$candidates")
+    if [ -z "$hit" ]; then
+        for pane in $candidates; do
+            [ -n "$(claude_pane_opt @claude-session "$pane")" ] && narrowed="$narrowed $pane"
+        done
+        hit=$(claude_pick_one "$narrowed")
+    fi
+    if [ -z "$hit" ]; then
+        narrowed=""
+        for pane in $candidates; do
+            case "$(tmux capture-pane -p -t "$pane" 2>/dev/null)" in
+                *"for shortcuts"*|*"esc to interrupt"*|*"mode on"*|*"bypass permissions"*)
+                    narrowed="$narrowed $pane" ;;
+            esac
+        done
+        hit=$(claude_pick_one "$narrowed")
+    fi
     [ -n "$hit" ] || return 1
 
     TMUX_PANE="$hit"
