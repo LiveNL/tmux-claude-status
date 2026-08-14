@@ -156,6 +156,22 @@ while read -r pane verdict; do
     if [ "$verdict" = "yes" ]; then
         if [ -n "$state" ]; then
             stamp_session "$pane"
+
+            # Approving a permission fires no event, and the next one only
+            # arrives when the command finishes — a long command left the tab
+            # red for its whole run. Claude spawns the command only once you
+            # have answered, so a shell under the session says the dialog is
+            # gone. This is the backstop; permission-window.sh reacts sooner.
+            if [ "$state" = "permission" ] \
+               && claude_pane_executing "$(tmux display-message -p -t "$pane" '#{pane_pid}' 2>/dev/null)"; then
+                printf 'granted %-16s %-5s (permission answered, command running)\n' "$win" "$pane"
+                [ -n "$DRY" ] || {
+                    TMUX_PANE="$pane" claude_set_state "running"
+                    TMUX_PANE="$pane" claude_mark_activity "tool-start" ""
+                    claude_start_spinner "$pane"
+                }
+                continue
+            fi
             kept=$(( kept + 1 ))
             continue
         fi

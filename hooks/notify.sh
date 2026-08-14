@@ -59,6 +59,15 @@ if [ "$(uname)" = "Darwin" ] && command -v osascript >/dev/null 2>&1; then
     CAN_NOTIFY="1"
 fi
 
+# alerter carries the terminal's own icon; the osascript fallback is stuck with
+# Script Editor's. A GUI-launched Claude inherits a PATH without Homebrew, so
+# look the binary up by absolute path too rather than losing the icon.
+ALERTER=$(command -v alerter 2>/dev/null)
+for candidate in /opt/homebrew/bin/alerter /usr/local/bin/alerter; do
+    [ -n "$ALERTER" ] && break
+    [ -x "$candidate" ] && ALERTER="$candidate"
+done
+
 set_state() {
     claude_set_state "$1"
 }
@@ -96,8 +105,10 @@ notify_macos() {
     local subtitle="$event"
 
     # alerter blocks until user interacts, so run in background subshell.
-    # On click (not timeout/dismiss), switch to the tmux window and focus the terminal.
-    if command -v alerter >/dev/null 2>&1 && [ -n "$TMUX_SESSION" ]; then
+    # On click (not timeout/dismiss), switch to the tmux window and focus the
+    # terminal. Sessions outside tmux still take this path — they just skip the
+    # window switch — so the notification keeps the terminal's icon.
+    if [ -n "$ALERTER" ]; then
         local sender=""
         for bundle in "org.alacritty" "com.googlecode.iterm2" "com.apple.Terminal" "co.ghostty.ghostty" "net.kovidgoyal.kitty" "dev.warp.Warp-Preview"; do
             if osascript -e "application id \"$bundle\" is running" 2>/dev/null | grep -q "true"; then
@@ -106,9 +117,10 @@ notify_macos() {
             fi
         done
 
-        local tmux_target="${TMUX_SESSION}:${TMUX_WINDOW_INDEX}"
+        local tmux_target=""
+        [ -n "$TMUX_SESSION" ] && tmux_target="${TMUX_SESSION}:${TMUX_WINDOW_INDEX}"
         (
-            result=$(alerter \
+            result=$("$ALERTER" \
                 --title "$title" \
                 --subtitle "$subtitle" \
                 --message "$msg" \
@@ -118,7 +130,7 @@ notify_macos() {
             case "$result" in
                 @TIMEOUT|@CLOSED) ;;
                 *)
-                    tmux switch-client -t "$tmux_target" 2>/dev/null
+                    [ -n "$tmux_target" ] && tmux switch-client -t "$tmux_target" 2>/dev/null
                     [ -n "$sender" ] && osascript -e "tell application id \"$sender\" to activate" 2>/dev/null
                     ;;
             esac

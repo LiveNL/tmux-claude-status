@@ -55,16 +55,38 @@ claude_session_of_pane() {
     basename "$newest" .jsonl
 }
 
-# Find the pane a session id was stamped on. Exact match only.
+# A conversation Claude forked into its daemon carries a new id, while the pane
+# still wears the id it was stamped with. The fork's own arguments name the
+# transcript it came from, so the parent id is readable rather than guessed:
+#
+#   --session-id <new> --fork-session --resume /…/projects/<slug>/<parent>.jsonl
+#
+# Args: <session id> [process table file for tests]. Prints the parent id.
+claude_parent_session() {
+    local want="$1" line
+    line=$({ [ -n "$2" ] && cat "$2" || ps -Ao command=; } |
+        grep -F -- "--session-id $want" | grep -F -- "--fork-session" | head -1)
+    [ -n "$line" ] || return 1
+    printf '%s' "$line" | sed -n 's/.*--resume [^ ]*\/\([0-9a-f-]\{36\}\)\.jsonl.*/\1/p'
+}
+
+# Find the pane a session id was stamped on. Exact match only, though a forked
+# conversation is followed back to the one it came from.
 claude_pane_of_session() {
-    local want="$1" pane stamped
+    local want="$1" pane stamped hops=0
     [ -n "$want" ] || return 1
-    while IFS="	" read -r pane stamped; do
-        [ "$stamped" = "$want" ] || continue
-        printf '%s' "$pane"
-        return 0
-    done <<EOF
+    while [ "$hops" -lt 4 ]; do
+        while IFS="	" read -r pane stamped; do
+            [ "$stamped" = "$want" ] || continue
+            printf '%s' "$pane"
+            return 0
+        done <<EOF
 $(tmux list-panes -a -F '#{pane_id}	#{@claude-session}' 2>/dev/null)
 EOF
+        # Not stamped anywhere: this may be a fork of a conversation that is.
+        want=$(claude_parent_session "$want" "$2") || return 1
+        [ -n "$want" ] || return 1
+        hops=$(( hops + 1 ))
+    done
     return 1
 }
