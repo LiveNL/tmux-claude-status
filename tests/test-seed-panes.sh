@@ -39,3 +39,13 @@ nosession; run
     || echo "FAIL lingering -> $(claude_pane_state "$A")"
 [ -z "$(t show-options -wqv -t "$W" @claude-state)" ] && echo "ok   window falls back to idle" \
     || echo "FAIL window=$(t show-options -wqv -t "$W" @claude-state)"
+
+# A pane that closes takes its state with it; the window must stop showing it.
+withsession; run
+TMUX_PANE="$A" claude_set_state running
+t kill-pane -t "$B" 2>/dev/null
+t split-window -t "$W" -d          # keep the window alive with a fresh pane
+NEW=$(t list-panes -t "$W" -F '#{pane_id}' | grep -v "^$A$" | head -1)
+t kill-pane -t "$A"
+run
+check "window drops a closed pane's state" "$(t show-options -wqv -t "$W" @claude-state)" ""

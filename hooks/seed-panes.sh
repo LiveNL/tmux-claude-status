@@ -142,5 +142,10 @@ done <<EOF
 $(panes_with_session "$PANES" "$CLAUDE_PS_TABLE")
 EOF
 
+# Windows are republished even when no pane changed: a pane that closed took
+# its state with it, and the window it left behind still advertises whatever
+# that pane last said.
+[ -n "$DRY" ] || claude_sync_all_windows
+
 printf '%s %s seeded, %s cleared, %s untouched\n' \
     "${DRY:+dry run:}" "$seeded" "$cleared" "$kept"

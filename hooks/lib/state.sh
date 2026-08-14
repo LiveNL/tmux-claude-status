@@ -145,6 +145,20 @@ claude_start_spinner() {
     return 0
 }
 
+# Recompute every window from its panes. A pane that closes takes its state
+# with it, but the window option it last published stays behind until someone
+# recalculates — a window whose running pane was closed would otherwise keep
+# spinning next to its remaining shell.
+claude_sync_all_windows() {
+    local pane
+    while IFS= read -r pane; do
+        [ -n "$pane" ] || continue
+        TMUX_PANE="$pane" claude_sync_window
+    done <<EOF
+$(tmux list-panes -a -F '#{pane_id}' 2>/dev/null)
+EOF
+}
+
 claude_clear_pane() {
     [ -n "$TMUX" ] || return 0
     [ -n "$TMUX_PANE" ] || return 1
