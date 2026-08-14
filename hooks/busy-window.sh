@@ -18,9 +18,16 @@ payload=$(cat 2>/dev/null)
 
 # Env probe: a session was seen running these hooks while none of its tmux
 # writes landed. Logs only while the file exists — delete it to switch off.
-[ -f /tmp/claude-hook-env.log ] && \
-    printf '%s busy   pane=%s tmux=%s ppid=%s cwd=%s\n' "$(date +%H:%M:%S)" "${TMUX_PANE:-UNSET}" "${TMUX:-UNSET}" "$PPID" "$PWD" \
-    >> /tmp/claude-hook-env.log
+[ -f /tmp/claude-hook-env.log ] && {
+    _anc=""; _p=$PPID
+    for _ in 1 2 3 4; do
+        _line=$(ps -p "$_p" -o ppid=,comm= 2>/dev/null) || break
+        _anc="$_anc <- $(printf '%s' "$_line" | awk '{print $2}' | xargs basename 2>/dev/null)"
+        _p=$(printf '%s' "$_line" | awk '{print $1}')
+        [ -z "$_p" ] || [ "$_p" = "1" ] && break
+    done
+    printf '%s %s pane=%s tmux=%s cwd=%s anc=%s\n' "$(date +%H:%M:%S)" "busy  " "${TMUX_PANE:-UNSET}" "${TMUX:+set}" "$PWD" "$_anc" >> /tmp/claude-hook-env.log
+}
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/state.sh"
 

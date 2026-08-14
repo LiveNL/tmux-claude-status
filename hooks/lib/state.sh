@@ -10,125 +10,29 @@
 #
 # Priority: permission > running > input > done > idle.
 
-# Hooks are meant to inherit TMUX and TMUX_PANE from the session firing them,
-# and most do. Some do not: a session that was resumed, or is being driven
-# from outside the terminal, runs its hooks with those variables missing, and
-# then every write in this file targets nothing at all while the hook still
-# reports success. Recover the pane instead of giving up on it.
+# A hook may only touch a tab when it can name its pane with certainty.
 #
-# The session id is the reliable handle — record-session.sh stamps it onto the
-# pane at SessionStart — with the working directory as a fallback, and only
-# when it identifies exactly one pane. Re-stamp whatever is found so the next
-# hook resolves directly.
+# TMUX_PANE is that certainty: the session inherited it from the pane it runs
+# in. Everything else that was tried here — matching the working directory, or
+# the text of the last reply against what each pane showed — was inference, and
+# inference put wrong glyphs on tabs.
 #
-# Returns non-zero when no pane can be identified; callers should exit.
+# The hooks that arrive without it are not tabs at all. Background and forked
+# sessions run under the daemon (`claude --bg-pty-host`), whose process tree
+# never touches tmux; they fire the same events as any session, and attributing
+# those to a pane meant an agent could drive a tab it does not own. They are
+# dropped here instead.
+#
+# Returns non-zero when this hook has no pane; callers exit on that.
 claude_bootstrap() {
-    local payload="$1" sid pane stamped cwd hit=""
-
     if [ -z "$TMUX" ]; then
         TMUX=$(tmux display-message -p '#{socket_path},0,0' 2>/dev/null) || return 1
         export TMUX
     fi
-
-    if [ -n "$TMUX_PANE" ] && tmux display-message -t "$TMUX_PANE" -p '' >/dev/null 2>&1; then
-        return 0
-    fi
-
-    sid=$(printf '%s' "$payload" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
-    if [ -n "$sid" ]; then
-        while IFS="	" read -r pane stamped; do
-            [ "$stamped" = "$sid" ] || continue
-            TMUX_PANE="$pane"
-            export TMUX_PANE
-            return 0
-        done <<EOF
-$(tmux list-panes -a -F '#{pane_id}	#{@claude-session}' 2>/dev/null)
-EOF
-    fi
-
-    # Directory fallback. A window usually holds the conversation plus an
-    # editor or shell in the same checkout, so matching on the path alone is
-    # ambiguous more often than not. Narrow it in two steps before giving up:
-    # panes that have ever recorded a session id, then panes actually showing
-    # a Claude TUI. Two live conversations in one checkout remain genuinely
-    # indistinguishable, and there a blank tab beats a confidently wrong one —
-    # the reconciler still repairs those from the screen.
-    # tmux reports the physical path, so resolve ours the same way — on macOS
-    # $PWD is routinely a symlink (/tmp, /var) and would never compare equal.
-    local here candidates="" narrowed=""
-    here=$(pwd -P 2>/dev/null) || here="$PWD"
-    while IFS="	" read -r pane cwd; do
-        [ "$cwd" = "$here" ] || continue
-        candidates="$candidates $pane"
-    done <<EOF
-$(tmux list-panes -a -F '#{pane_id}	#{pane_current_path}' 2>/dev/null)
-EOF
-
-    claude_pick_one() {  # prints the single survivor, or nothing
-        local list="$1" p keep="" count=0
-        for p in $list; do
-            keep="$p"
-            count=$(( count + 1 ))
-        done
-        [ "$count" -eq 1 ] && printf '%s' "$keep"
-    }
-
-    hit=$(claude_pick_one "$candidates")
-    if [ -z "$hit" ]; then
-        for pane in $candidates; do
-            [ -n "$(claude_pane_opt @claude-session "$pane")" ] && narrowed="$narrowed $pane"
-        done
-        hit=$(claude_pick_one "$narrowed")
-    fi
-    if [ -z "$hit" ]; then
-        narrowed=""
-        for pane in $candidates; do
-            case "$(tmux capture-pane -p -t "$pane" 2>/dev/null)" in
-                *"for shortcuts"*|*"esc to interrupt"*|*"mode on"*|*"bypass permissions"*)
-                    narrowed="$narrowed $pane" ;;
-            esac
-        done
-        hit=$(claude_pick_one "$narrowed")
-        candidates="${narrowed:-$candidates}"
-    fi
-
-    # Last resort: several conversations in one checkout is normal — a monorepo
-    # with a window per topic leaves five identical candidates. What separates
-    # them is what each one says, and Stop carries the reply Claude just
-    # printed. Score candidates on how many of its distinctive words are on
-    # their screen; a clear winner is the pane that printed it.
-    if [ -z "$hit" ] && [ -n "$payload" ]; then
-        local msg words word screen score best="" best_score=0 runner=0
-        msg=$(printf '%s' "$payload" | jq -r '.last_assistant_message // empty' 2>/dev/null)
-        [ -n "$msg" ] || msg=$(printf '%s' "$payload" |
-            sed -n 's/.*"last_assistant_message"[[:space:]]*:[[:space:]]*"\([^"]\{20,\}\)".*/\1/p')
-        words=$(printf '%s' "$msg" | tr -cs '[:alnum:]' '\n' | awk 'length($0) >= 6' | head -12)
-
-        if [ -n "$words" ]; then
-            for pane in $candidates; do
-                screen=$(tmux capture-pane -p -t "$pane" 2>/dev/null)
-                score=0
-                for word in $words; do
-                    case "$screen" in *"$word"*) score=$(( score + 1 )) ;; esac
-                done
-                if [ "$score" -gt "$best_score" ]; then
-                    runner="$best_score"
-                    best_score="$score"
-                    best="$pane"
-                elif [ "$score" -gt "$runner" ]; then
-                    runner="$score"
-                fi
-            done
-            # Needs to be both convincing and clearly ahead of the next pane,
-            # otherwise two windows discussing the same work would trade tabs.
-            [ "$best_score" -ge 3 ] && [ "$best_score" -gt "$runner" ] && hit="$best"
-        fi
-    fi
-    [ -n "$hit" ] || return 1
-
-    TMUX_PANE="$hit"
-    export TMUX_PANE
-    [ -n "$sid" ] && tmux set-option -p -t "$TMUX_PANE" @claude-session "$sid" 2>/dev/null
+    [ -n "$TMUX_PANE" ] || return 1
+    # The pane can be gone: a window closed while its session lived on, or an
+    # id inherited from a pane that no longer exists.
+    tmux display-message -t "$TMUX_PANE" -p '' >/dev/null 2>&1 || return 1
     return 0
 }
 

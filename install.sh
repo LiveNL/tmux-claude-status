@@ -43,10 +43,10 @@ mkdir -p "$HOOKS_DEST/lib"
 cp "$SCRIPT_DIR/hooks/lib/state.sh" "$HOOKS_DEST/lib/state.sh"
 ok "Installed $HOOKS_DEST/lib/state.sh"
 
-# Repair tool — not wired to an event, run by hand or from a restore script.
-cp "$SCRIPT_DIR/hooks/reconcile-panes.sh" "$HOOKS_DEST/reconcile-panes.sh"
-chmod +x "$HOOKS_DEST/reconcile-panes.sh"
-ok "Installed $HOOKS_DEST/reconcile-panes.sh"
+# Seeder — not wired to an event; run from tmux at startup or by hand.
+cp "$SCRIPT_DIR/hooks/seed-panes.sh" "$HOOKS_DEST/seed-panes.sh"
+chmod +x "$HOOKS_DEST/seed-panes.sh"
+ok "Installed $HOOKS_DEST/seed-panes.sh"
 
 # ── Step 2: Merge settings.json ────────────────────────────────────────────
 
