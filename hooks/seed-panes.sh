@@ -178,6 +178,20 @@ done <<EOF
 $(panes_with_session "$PANES" "$CLAUDE_PS_TABLE")
 EOF
 
+# Name the panes whose session cannot be linked to their hooks, so a tab that
+# can only ever show presence is visible as such rather than quietly stale.
+if [ -z "$DRY" ] || true; then
+    while IFS= read -r pane; do
+        [ -n "$pane" ] || continue
+        [ -n "$(claude_pane_state "$pane")" ] || continue
+        [ -n "$(claude_pane_opt @claude-session "$pane")" ] && continue
+        printf 'unlinked %-15s %-5s (session runs in the daemon, hooks cannot name it)\n' \
+            "$(tmux display-message -p -t "$pane" '#{session_name}:#{window_index}')" "$pane"
+    done <<EOL
+$(tmux list-panes -a -F '#{pane_id}' 2>/dev/null)
+EOL
+fi
+
 # Windows are republished even when no pane changed: a pane that closed took
 # its state with it, and the window it left behind still advertises whatever
 # that pane last said.
