@@ -33,14 +33,21 @@ claude_pane_state() {
 claude_sync_window() {
     local panes pane state rank best=0 winner=""
     panes=$(tmux list-panes -F '#{pane_id}' -t "$TMUX_PANE" 2>/dev/null) || return 0
-    for pane in $panes; do
+    # Read line by line rather than looping over an unquoted $panes: zsh does
+    # not word-split parameters, so that form hands the whole list over as a
+    # single bogus pane id and the window ends up cleared. Hooks run under
+    # bash, but this file gets sourced by hand from a shell prompt too.
+    while IFS= read -r pane; do
+        [ -n "$pane" ] || continue
         state=$(claude_pane_state "$pane")
         rank=$(claude_state_rank "$state")
         if [ "$rank" -gt "$best" ]; then
             best="$rank"
             winner="$state"
         fi
-    done
+    done <<EOF
+$panes
+EOF
     tmux set-option -w -t "$TMUX_PANE" @claude-state "$winner" 2>/dev/null
     tmux refresh-client -S 2>/dev/null
 }
