@@ -1,21 +1,22 @@
 #!/bin/bash
-# Isolated test of the pane-state aggregate. Runs in its own tmux session.
-source /Users/livenl/projects/claude-tmux-hooks/hooks/lib/state.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+test_server_start
+trap test_server_stop EXIT
+# Isolated test of the pane-state aggregate. Runs in its own t session.
 
-: "${TMUX:=$(tmux display-message -p '#{socket_path},0,0')}"
 export TMUX
 
-tmux kill-session -t hooktest 2>/dev/null
-tmux new-session -d -s hooktest -x 80 -y 24
-WIN=$(tmux list-windows -t hooktest -F '#{window_id}' | head -1)
-tmux split-window -t "$WIN" -d
+t kill-session -t hooktest 2>/dev/null
+t new-session -d -s hooktest -x 80 -y 24
+WIN=$(t list-windows -t hooktest -F '#{window_id}' | head -1)
+t split-window -t "$WIN" -d
 
 A=""; B=""
 while read -r pane; do
     if [ -z "$A" ]; then A="$pane"; else B="$pane"; fi
-done < <(tmux list-panes -t "$WIN" -F '#{pane_id}')
+done < <(t list-panes -t "$WIN" -F '#{pane_id}')
 
-win() { tmux show-options -wqv -t "$WIN" @claude-state; }
+win() { t show-options -wqv -t "$WIN" @claude-state; }
 check() { # label expected
     local got
     got=$(win)
@@ -37,7 +38,7 @@ check "permission beats done" "permission"
 TMUX_PANE="$B" claude_clear_pane
 check "cleared pane falls back to sibling" "done"
 
-tmux kill-pane -t "$A"
+t kill-pane -t "$A"
 TMUX_PANE="$B" claude_sync_window
 check "dead pane leaves no state" ""
 
@@ -47,4 +48,4 @@ TMUX_PANE="$B" bash -c 'source /Users/livenl/projects/claude-tmux-hooks/hooks/li
   printf "phase=%s tool=%s beat=%s\n" "$(claude_pane_opt @claude-pane-phase)" \
     "$(claude_pane_opt @claude-pane-tool)" "$(claude_pane_opt @claude-pane-beat)"'
 
-tmux kill-session -t hooktest 2>/dev/null
+t kill-session -t hooktest 2>/dev/null

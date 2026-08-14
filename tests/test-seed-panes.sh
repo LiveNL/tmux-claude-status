@@ -1,21 +1,21 @@
 #!/bin/bash
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+test_server_start
+trap test_server_stop EXIT
 # What the seeder writes, given a known process tree. It fills blanks, clears
 # panes whose session is gone, and never touches a state a hook has set.
-HOOKS=/Users/livenl/projects/claude-tmux-hooks/hooks
-source "$HOOKS/lib/state.sh"
-: "${TMUX:=$(tmux display-message -p '#{socket_path},0,0')}"; export TMUX
 
-tmux kill-session -t seedtest 2>/dev/null
-tmux new-session -d -s seedtest -x 80 -y 24 -c /tmp
-W=$(tmux list-windows -t seedtest -F '#{window_id}' | head -1)
-A=$(tmux list-panes -t "$W" -F '#{pane_id}' | head -1)
-tmux split-window -t "$W" -d -c /tmp
-B=$(tmux list-panes -t "$W" -F '#{pane_id}' | tail -1)
+t kill-session -t seedtest 2>/dev/null
+t new-session -d -s seedtest -x 80 -y 24 -c /tmp
+W=$(t list-windows -t seedtest -F '#{window_id}' | head -1)
+A=$(t list-panes -t "$W" -F '#{pane_id}' | head -1)
+t split-window -t "$W" -d -c /tmp
+B=$(t list-panes -t "$W" -F '#{pane_id}' | tail -1)
 if [ -z "$A" ] || [ -z "$B" ]; then echo "FAIL harness: no test panes"; exit 1; fi
 
-APID=$(tmux display-message -p -t "$A" '#{pane_pid}')
-BPID=$(tmux display-message -p -t "$B" '#{pane_pid}')
-TABLE=$(mktemp); trap 'rm -f "$TABLE"; tmux kill-session -t seedtest 2>/dev/null' EXIT
+APID=$(t display-message -p -t "$A" '#{pane_pid}')
+BPID=$(t display-message -p -t "$B" '#{pane_pid}')
+TABLE=$(mktemp); trap 'rm -f "$TABLE"; t kill-session -t seedtest 2>/dev/null' EXIT
 
 # A holds a session, B is a plain shell.
 withsession() { printf '%s 1 /bin/zsh\n%s %s /Users/livenl/.local/bin/claude\n%s 1 /bin/zsh\n' \
@@ -37,5 +37,5 @@ TMUX_PANE="$A" claude_set_state running; run
 nosession; run
 [ -z "$(claude_pane_state "$A")" ] && echo "ok   state cleared when the session is gone" \
     || echo "FAIL lingering -> $(claude_pane_state "$A")"
-[ -z "$(tmux show-options -wqv -t "$W" @claude-state)" ] && echo "ok   window falls back to idle" \
-    || echo "FAIL window=$(tmux show-options -wqv -t "$W" @claude-state)"
+[ -z "$(t show-options -wqv -t "$W" @claude-state)" ] && echo "ok   window falls back to idle" \
+    || echo "FAIL window=$(t show-options -wqv -t "$W" @claude-state)"

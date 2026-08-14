@@ -1,27 +1,27 @@
 #!/bin/bash
-# End-to-end test of notify.sh state decisions, in a throwaway tmux session.
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+test_server_start
+trap test_server_stop EXIT
+# End-to-end test of notify.sh state decisions, in a throwaway t session.
 # The test window is its own session's current window, so IS_ACTIVE=1 and no
 # desktop notification ever fires.
-HOOKS=/Users/livenl/projects/claude-tmux-hooks/hooks
-source "$HOOKS/lib/state.sh"
 
-: "${TMUX:=$(tmux display-message -p '#{socket_path},0,0')}"
 export TMUX
 export DEBUG_CLAUDE_HOOKS=1
 LOG=/tmp/claude-notify-test.log
 rm -f "$LOG"
 
-tmux kill-session -t notifytest 2>/dev/null
-tmux new-session -d -s notifytest -x 80 -y 24
-WIN=$(tmux list-windows -t notifytest -F '#{window_id}' | head -1)
-P=$(tmux list-panes -t "$WIN" -F '#{pane_id}' | head -1)
+t kill-session -t notifytest 2>/dev/null
+t new-session -d -s notifytest -x 80 -y 24
+WIN=$(t list-windows -t notifytest -F '#{window_id}' | head -1)
+P=$(t list-panes -t "$WIN" -F '#{pane_id}' | head -1)
 
 # state, phase, tool, beat-age-seconds
 setup() {
     TMUX_PANE="$P" claude_set_state "$1"
-    tmux set-option -p -t "$P" @claude-pane-phase "$2"
-    tmux set-option -p -t "$P" @claude-pane-tool "$3"
-    tmux set-option -p -t "$P" @claude-pane-beat "$(( $(date +%s) - $4 ))"
+    t set-option -p -t "$P" @claude-pane-phase "$2"
+    t set-option -p -t "$P" @claude-pane-tool "$3"
+    t set-option -p -t "$P" @claude-pane-beat "$(( $(date +%s) - $4 ))"
 }
 
 fire() { # event message last_assistant_message
@@ -67,4 +67,4 @@ echo "-- debug log --"
 cp /tmp/claude-notify.log "$LOG" 2>/dev/null
 tail -4 "$LOG" 2>/dev/null | cut -c1-150
 
-tmux kill-session -t notifytest 2>/dev/null
+t kill-session -t notifytest 2>/dev/null

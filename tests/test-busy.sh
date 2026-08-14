@@ -1,15 +1,15 @@
 #!/bin/bash
-# Spinner lifecycle test for busy-window.sh in a throwaway tmux session.
-HOOKS=/Users/livenl/projects/claude-tmux-hooks/hooks
-source "$HOOKS/lib/state.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+test_server_start
+trap test_server_stop EXIT
+# Spinner lifecycle test for busy-window.sh in a throwaway t session.
 
-: "${TMUX:=$(tmux display-message -p '#{socket_path},0,0')}"
 export TMUX
 
-tmux kill-session -t busytest 2>/dev/null
-tmux new-session -d -s busytest -x 80 -y 24
-WIN=$(tmux list-windows -t busytest -F '#{window_id}' | head -1)
-P=$(tmux list-panes -t "$WIN" -F '#{pane_id}' | head -1)
+t kill-session -t busytest 2>/dev/null
+t new-session -d -s busytest -x 80 -y 24
+WIN=$(t list-windows -t busytest -F '#{window_id}' | head -1)
+P=$(t list-panes -t "$WIN" -F '#{pane_id}' | head -1)
 LOCK="/tmp/claude-spinner-${P#%}.lock"
 rm -rf "$LOCK"
 
@@ -17,14 +17,14 @@ check() { if [ "$2" = "$3" ]; then echo "ok   $1 -> '$2'"; else echo "FAIL $1 ->
 
 printf '{"hook_event_name":"PreToolUse","tool_name":"Bash"}' | TMUX_PANE="$P" bash "$HOOKS/busy-window.sh"
 check "pane state" "$(TMUX_PANE=$P claude_pane_state)" "running"
-check "window state" "$(tmux show-options -wqv -t "$WIN" @claude-state)" "running"
+check "window state" "$(t show-options -wqv -t "$WIN" @claude-state)" "running"
 check "phase" "$(TMUX_PANE=$P claude_pane_opt @claude-pane-phase)" "tool-start"
 check "tool" "$(TMUX_PANE=$P claude_pane_opt @claude-pane-tool)" "Bash"
 [ -d "$LOCK" ] && echo "ok   spinner lock created" || echo "FAIL spinner lock missing"
 
-f1=$(tmux show-options -wqv -t "$WIN" @claude-spinner)
+f1=$(t show-options -wqv -t "$WIN" @claude-spinner)
 sleep 0.7
-f2=$(tmux show-options -wqv -t "$WIN" @claude-spinner)
+f2=$(t show-options -wqv -t "$WIN" @claude-spinner)
 [ "$f1" != "$f2" ] && echo "ok   spinner animates ($f1 -> $f2)" || echo "FAIL spinner frozen on $f1"
 
 # A second concurrent call must not spawn a second spinner.
@@ -38,5 +38,5 @@ sleep 1.2
 check "state after stop" "$(TMUX_PANE=$P claude_pane_state)" "done"
 [ -d "$LOCK" ] && echo "FAIL lock still present after stop" || echo "ok   spinner exited and removed lock"
 
-tmux kill-session -t busytest 2>/dev/null
+t kill-session -t busytest 2>/dev/null
 rm -rf "$LOCK"

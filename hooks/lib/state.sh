@@ -58,6 +58,7 @@ claude_pane_state() {
 # went away takes its state with it, so this also garbage-collects.
 claude_sync_window() {
     local panes pane state rank best=0 winner=""
+    [ -n "$TMUX_PANE" ] || return 1
     panes=$(tmux list-panes -F '#{pane_id}' -t "$TMUX_PANE" 2>/dev/null) || return 0
     # Read line by line rather than looping over an unquoted $panes: zsh does
     # not word-split parameters, so that form hands the whole list over as a
@@ -80,6 +81,9 @@ EOF
 
 claude_set_state() {
     [ -n "$TMUX" ] || return 0
+    # tmux resolves an empty target to the active pane, so a caller that lost
+    # its pane id would silently rewrite whichever tab happens to be focused.
+    [ -n "$TMUX_PANE" ] || return 1
     tmux set-option -p -t "$TMUX_PANE" @claude-pane-state "$1" 2>/dev/null
     claude_sync_window
 }
@@ -89,6 +93,7 @@ claude_set_state() {
 # same Notification text arrives in both cases.
 claude_mark_activity() {
     [ -n "$TMUX" ] || return 0
+    [ -n "$TMUX_PANE" ] || return 1
     tmux set-option -p -t "$TMUX_PANE" @claude-pane-phase "$1" 2>/dev/null
     tmux set-option -p -t "$TMUX_PANE" @claude-pane-tool "${2:-}" 2>/dev/null
     tmux set-option -p -t "$TMUX_PANE" @claude-pane-beat "$(date +%s)" 2>/dev/null
@@ -142,6 +147,7 @@ claude_start_spinner() {
 
 claude_clear_pane() {
     [ -n "$TMUX" ] || return 0
+    [ -n "$TMUX_PANE" ] || return 1
     local opt
     for opt in @claude-pane-state @claude-pane-phase @claude-pane-tool @claude-pane-beat; do
         tmux set-option -p -u -t "$TMUX_PANE" "$opt" 2>/dev/null
