@@ -2,6 +2,9 @@
 # Fired on Stop and Notification events.
 # Updates the tmux window state and sends a desktop notification (macOS only).
 
+NOTIFIER_INPUT=$(cat)
+_sid=$(printf %s "$NOTIFIER_INPUT" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+
 # Env probe: a session was seen running this hook while none of its tmux
 # writes landed. Logs only while the file exists — delete it to switch off.
 [ -f /tmp/claude-hook-env.log ] && {
@@ -12,10 +15,9 @@
         _p=$(printf '%s' "$_line" | awk '{print $1}')
         [ -z "$_p" ] || [ "$_p" = "1" ] && break
     done
-    printf '%s %s pane=%s tmux=%s cwd=%s anc=%s\n' "$(date +%H:%M:%S)" "notify" "${TMUX_PANE:-UNSET}" "${TMUX:+set}" "$PWD" "$_anc" >> /tmp/claude-hook-env.log
+    printf '%s %s pane=%s tmux=%s sid=%s cwd=%s anc=%s\n' "$(date +%H:%M:%S)" "notify" "${TMUX_PANE:-UNSET}" "${TMUX:+set}" "$_sid" "$PWD" "$_anc" >> /tmp/claude-hook-env.log
 }
 
-NOTIFIER_INPUT=$(cat)
 MESSAGE=$(echo "$NOTIFIER_INPUT" | jq -r '.message // empty')
 EVENT=$(echo "$NOTIFIER_INPUT" | jq -r '.hook_event_name // empty')
 LAST_MSG=$(echo "$NOTIFIER_INPUT" | jq -r '.last_assistant_message // empty')

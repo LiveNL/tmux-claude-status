@@ -15,6 +15,7 @@
 # can ever exist; every other invocation just updates state and exits.
 
 payload=$(cat 2>/dev/null)
+_sid=$(printf %s "$payload" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
 
 # Env probe: a session was seen running these hooks while none of its tmux
 # writes landed. Logs only while the file exists — delete it to switch off.
@@ -26,7 +27,7 @@ payload=$(cat 2>/dev/null)
         _p=$(printf '%s' "$_line" | awk '{print $1}')
         [ -z "$_p" ] || [ "$_p" = "1" ] && break
     done
-    printf '%s %s pane=%s tmux=%s cwd=%s anc=%s\n' "$(date +%H:%M:%S)" "busy  " "${TMUX_PANE:-UNSET}" "${TMUX:+set}" "$PWD" "$_anc" >> /tmp/claude-hook-env.log
+    printf '%s %s pane=%s tmux=%s sid=%s cwd=%s anc=%s\n' "$(date +%H:%M:%S)" "busy  " "${TMUX_PANE:-UNSET}" "${TMUX:+set}" "$_sid" "$PWD" "$_anc" >> /tmp/claude-hook-env.log
 }
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/state.sh"

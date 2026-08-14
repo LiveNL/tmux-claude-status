@@ -25,34 +25,17 @@ claude_project_dir() {
     printf '%s/%s' "$CLAUDE_PROJECTS" "$(printf '%s' "$1" | sed 's/[^a-zA-Z0-9-]/-/g')"
 }
 
-# Args: <pane claude pid> <pane cwd>. Prints the session id, or nothing.
+# Args: <pane claude pid>. Prints the session id, or nothing.
+#
+# Only what the process states about itself counts. An earlier version looked
+# for the transcript quoting the id a session was resumed from, which read as
+# clever and was wrong: a conversation gets quoted in other transcripts too, so
+# it handed panes the id of a neighbouring session. Everything else comes from
+# the SessionStart stamp, the fork chain, or link-pane.sh.
 claude_session_of_pane() {
-    local pid="$1" cwd="$2" cmdline sid dir newest
-
+    local pid="$1" cmdline
     cmdline=$(ps -p "$pid" -o command= 2>/dev/null) || return 1
-
-    # Started for one specific session: nothing to work out.
-    sid=$(printf '%s' "$cmdline" | sed -n 's/.*--session-id \([0-9a-f-]\{36\}\).*/\1/p')
-    if [ -n "$sid" ]; then
-        printf '%s' "$sid"
-        return 0
-    fi
-
-    # Resumed: the live transcript is the one quoting the id it resumed from.
-    sid=$(printf '%s' "$cmdline" | sed -n 's/.*--resume \([0-9a-f-]\{36\}\).*/\1/p')
-    [ -n "$sid" ] || return 1
-
-    dir=$(claude_project_dir "$cwd")
-    [ -d "$dir" ] || return 1
-
-    # Newest first: a conversation resumed more than once leaves a trail, and
-    # the most recently written file is the session running now.
-    newest=$(grep -l -- "$sid" "$dir"/*.jsonl 2>/dev/null | while IFS= read -r f; do
-        printf '%s\t%s\n' "$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null)" "$f"
-    done | sort -rn | head -1 | cut -f2)
-    [ -n "$newest" ] || return 1
-
-    basename "$newest" .jsonl
+    printf '%s' "$cmdline" | sed -n 's/.*--session-id \([0-9a-f-]\{36\}\).*/\1/p' | head -1
 }
 
 # A conversation Claude forked into its daemon carries a new id, while the pane
