@@ -43,4 +43,19 @@ printf '%s' "$stop" | TMUX_PANE="$B" bash "$HOOKS/notify.sh"
 [ "$(t show-options -wqv -t "$W" @claude-state)" = "done" ] \
     && echo "ok   window reflects the panes" || echo "FAIL window=$(t show-options -wqv -t "$W" @claude-state)"
 
-t kill-session -t stricttest 2>/dev/null
+# 6. A hook from a daemon-owned background process: no pane in its environment,
+# but the pane carries the same session id, so it lands exactly there.
+SID=44444444-4444-4444-4444-444444444444
+t set-option -p -t "$A" @claude-session "$SID"
+t set-option -p -u -t "$A" @claude-pane-state
+printf '{"hook_event_name":"PreToolUse","session_id":"%s","tool_name":"Bash"}' "$SID" \
+    | env -u TMUX_PANE bash "$HOOKS/busy-window.sh"
+check "session id finds the pane when the env cannot" "$(claude_pane_state "$A")" "running"
+
+# 7. An id belonging to no pane — a forked or background conversation — is
+# still nobody's tab.
+t set-option -p -u -t "$A" @claude-pane-state
+t set-option -p -u -t "$B" @claude-pane-state
+printf '{"hook_event_name":"PreToolUse","session_id":"deadbeef-0000-0000-0000-000000000000","tool_name":"Bash"}' \
+    | env -u TMUX_PANE bash "$HOOKS/busy-window.sh"
+check "an unstamped session stays off the tabs" "$(claude_pane_state "$A")$(claude_pane_state "$B")" ""

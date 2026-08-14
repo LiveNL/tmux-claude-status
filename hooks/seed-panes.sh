@@ -22,6 +22,7 @@
 #   seed-panes.sh --watch [n]  keep panes seeded, default every 10s
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/state.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/session-map.sh"
 
 # Test seam: a file of "pid ppid comm" lines standing in for the live process
 # table, so the writing behaviour can be exercised against a known tree.
@@ -109,6 +110,36 @@ panes_with_session() {
     ' - "$1"
 }
 
+# Keep each pane labelled with the session running in it. Cheap when nothing
+# changed: the id is only recomputed when the pane carries none.
+stamp_session() {
+    local pane="$1" pid cwd sid
+    [ -n "$(claude_pane_opt @claude-session "$pane")" ] && return 0
+    pid=$(claude_pane_claude_pid "$pane") || return 0
+    [ -n "$pid" ] || return 0
+    cwd=$(tmux display-message -p -t "$pane" '#{pane_current_path}' 2>/dev/null)
+    sid=$(claude_session_of_pane "$pid" "$cwd") || return 0
+    [ -n "$sid" ] && tmux set-option -p -t "$pane" @claude-session "$sid" 2>/dev/null
+    return 0
+}
+
+# The Claude process inside a pane, from the same snapshot logic as the verdict.
+claude_pane_claude_pid() {
+    local root
+    root=$(tmux display-message -p -t "$1" '#{pane_pid}' 2>/dev/null) || return 1
+    ps -Ao pid=,ppid=,comm= | awk -v root="$root" '
+        { kids[$2] = kids[$2] " " $1; comm[$1] = $3 }
+        function is_claude(c) { return (c ~ /(^|\/)claude$/ || c ~ /\/versions\/[0-9]/) }
+        function walk(p, d,   n, a, i) {
+            if (d > 8) return 0
+            if (is_claude(comm[p])) { print p; return 1 }
+            n = split(kids[p], a, " ")
+            for (i = 1; i <= n; i++) if (a[i] != "" && walk(a[i], d + 1)) return 1
+            return 0
+        }
+        END { walk(root, 0) }'
+}
+
 seeded=0
 cleared=0
 kept=0
@@ -124,9 +155,14 @@ while read -r pane verdict; do
 
     if [ "$verdict" = "yes" ]; then
         if [ -n "$state" ]; then
+            stamp_session "$pane"
             kept=$(( kept + 1 ))
             continue
         fi
+        # Label the pane with the conversation running in it, so hooks that
+        # arrive without a pane can still find their tab by session id.
+        stamp_session "$pane"
+
         printf 'seed    %-16s %-5s (session present, no state yet)\n' "$win" "$pane"
         seeded=$(( seeded + 1 ))
         [ -n "$DRY" ] && continue

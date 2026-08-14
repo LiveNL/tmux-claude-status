@@ -29,7 +29,20 @@ claude_bootstrap() {
         TMUX=$(tmux display-message -p '#{socket_path},0,0' 2>/dev/null) || return 1
         export TMUX
     fi
-    [ -n "$TMUX_PANE" ] || return 1
+    if [ -z "$TMUX_PANE" ]; then
+        # Claude runs tools through pre-warmed background processes owned by
+        # its daemon, which never inherited tmux. Their hooks carry the same
+        # session id as the pane's conversation, and seed-panes.sh stamps that
+        # id onto the pane, so the two meet on an exact match — no inference.
+        local sid pane
+        sid=$(printf '%s' "$1" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+        [ -n "$sid" ] || return 1
+        source "$(dirname "${BASH_SOURCE[0]}")/session-map.sh"
+        pane=$(claude_pane_of_session "$sid") || return 1
+        [ -n "$pane" ] || return 1
+        TMUX_PANE="$pane"
+        export TMUX_PANE
+    fi
     # The pane can be gone: a window closed while its session lived on, or an
     # id inherited from a pane that no longer exists.
     tmux display-message -t "$TMUX_PANE" -p '' >/dev/null 2>&1 || return 1
