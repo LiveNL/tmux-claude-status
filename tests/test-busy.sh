@@ -6,7 +6,6 @@ trap test_server_stop EXIT
 
 export TMUX
 
-t kill-session -t busytest 2>/dev/null
 t new-session -d -s busytest -x 80 -y 24
 WIN=$(t list-windows -t busytest -F '#{window_id}' | head -1)
 P=$(t list-panes -t "$WIN" -F '#{pane_id}' | head -1)
@@ -38,5 +37,15 @@ sleep 1.2
 check "state after stop" "$(TMUX_PANE=$P claude_pane_state)" "done"
 [ -d "$LOCK" ] && echo "FAIL lock still present after stop" || echo "ok   spinner exited and removed lock"
 
-t kill-session -t busytest 2>/dev/null
 rm -rf "$LOCK"
+
+# A question is not work: it blocks on you, so the tab must say so at once
+# rather than spin until the idle notification arrives a minute later.
+t set-option -p -u -t "$P" @claude-pane-state
+rm -rf "$LOCK"
+printf '{"hook_event_name":"PreToolUse","tool_name":"AskUserQuestion"}' | TMUX_PANE="$P" bash "$HOOKS/busy-window.sh"
+check "a question asks, it does not run" "$(TMUX_PANE=$P claude_pane_state)" "input"
+[ -d "$LOCK" ] && echo "FAIL a question started a spinner" || echo "ok   no spinner for a question"
+
+printf '{"hook_event_name":"PostToolUse","tool_name":"AskUserQuestion"}' | TMUX_PANE="$P" bash "$HOOKS/busy-window.sh"
+check "answering resumes the run" "$(TMUX_PANE=$P claude_pane_state)" "running"

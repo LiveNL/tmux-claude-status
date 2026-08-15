@@ -52,7 +52,21 @@ case "$event" in
 esac
 
 claude_mark_activity "$phase" "$tool"
-claude_set_state "running"
+
+# Some tools are the waiting. A question or a plan put to you blocks on your
+# answer, and nothing else fires until you give it — the tab used to spin for
+# as long as you took to read it, until the idle notification a minute later
+# finally corrected it. The tool name says so outright.
+case "$event:$tool" in
+    PreToolUse:AskUserQuestion|PreToolUse:ExitPlanMode)
+        claude_set_state "input"
+        want_spinner=""
+        ;;
+    *)
+        claude_set_state "running"
+        want_spinner=1
+        ;;
+esac
 
 # A prompt or tool call is proof the conversation resumed, so release an
 # auto-park right here — the Claude TUI runs on the alternate screen, where
@@ -78,6 +92,8 @@ if [ -x "$PARK" ]; then
     fi
 fi
 
-claude_start_spinner "$TMUX_PANE"
+[ -n "$want_spinner" ] && claude_start_spinner "$TMUX_PANE"
+
+exit 0
 
 exit 0
