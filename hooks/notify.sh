@@ -100,9 +100,11 @@ awaiting_user() {
 
 # Args: event_label msg sound
 # Title = repo name (prominent), subtitle = event label
+# Sounds muted 2026-08-24: banners only. The empty sound skips the flag/clause
+# below; re-enable by restoring sound="$3" — call sites still pass the names.
 notify_macos() {
     [ "$CAN_NOTIFY" = "1" ] || return 0
-    local event="$1" msg="$2" sound="$3"
+    local event="$1" msg="$2" sound=""
     local title="$REPO_NAME"
     local subtitle="$event"
 
@@ -126,7 +128,7 @@ notify_macos() {
                 --title "$title" \
                 --subtitle "$subtitle" \
                 --message "$msg" \
-                --sound "$sound" \
+                ${sound:+--sound "$sound"} \
                 --timeout 30 \
                 ${sender:+--sender "$sender"} 2>/dev/null)
             case "$result" in
@@ -141,7 +143,7 @@ notify_macos() {
         return
     fi
 
-    osascript -e "display notification \"$msg\" with title \"$title\" subtitle \"$subtitle\" sound name \"$sound\""
+    osascript -e "display notification \"$msg\" with title \"$title\" subtitle \"$subtitle\"${sound:+ sound name \"$sound\"}"
 }
 
 if [ -n "$TMUX" ] && [ "${DEBUG_CLAUDE_HOOKS:-0}" = "1" ]; then
