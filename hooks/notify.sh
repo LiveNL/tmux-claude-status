@@ -167,7 +167,10 @@ fi
 if [ "$EVENT" = "Stop" ]; then
     claude_mark_activity "stop" ""
     PREVIEW=$(preview "$LAST_MSG")
-    if echo "$LAST_MSG" | grep -q '?$'; then
+    # A trailing question mark, or a closing "Next step:" line (house style ends
+    # answers that want a decision with one) — both mean the turn awaits input.
+    LAST_LINE=$(printf '%s' "$LAST_MSG" | grep -v '^[[:space:]]*$' | tail -1)
+    if echo "$LAST_MSG" | grep -q '?$' || printf '%s' "$LAST_LINE" | grep -qiE '^\**Next step:'; then
         set_state "input"
         if [ "$IS_ACTIVE" != "1" ]; then
             notify_macos "❓ Question" "${PREVIEW:-Claude needs your input}" "Pop"
