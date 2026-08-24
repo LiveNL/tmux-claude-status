@@ -187,15 +187,23 @@ claude_clear_pane() {
 # Claude spawns the command only once permission is granted, so a shell running
 # under its process is proof the dialog has been answered. An idle session has
 # no shell child at all; language servers and caffeinate are not shells and do
-# not count. Args: <pane pid>. Optional second arg: a process table for tests.
+# not count. Neither does Claude's own plumbing: the statusline refresh and
+# hook scripts run as shell children of the session even while the dialog is
+# still open, and mistaking one for the approved command flipped the red tab
+# back to running with the prompt still on screen.
+# Args: <pane pid>. Optional second arg: a process table for tests.
 claude_pane_executing() {
-    { [ -n "$2" ] && cat "$2" || ps -Ao pid=,ppid=,comm=; } | awk -v root="$1" '
-        { kids[$2] = kids[$2] " " $1; comm[$1] = $3 }
+    { [ -n "$2" ] && cat "$2" || ps -Ao pid=,ppid=,comm=,args=; } | awk -v root="$1" '
+        { kids[$2] = kids[$2] " " $1; comm[$1] = $3
+          line = ""; for (i = 4; i <= NF; i++) line = line " " $i; argv[$1] = line }
         function is_claude(c) { return (c ~ /(^|\/)claude$/ || c ~ /\/versions\/[0-9]/) }
         function is_shell(c)  { return (c ~ /(^|\/)(bash|sh|zsh|dash|fish)$/) }
-        # Below the session process, any shell is a command being run.
+        function is_plumbing(pid) { return (argv[pid] ~ /statusline\.sh|\/hooks\//) }
+        # Below the session process, any shell is a command being run —
+        # except plumbing, whose whole subtree is pruned.
         function under_claude(pid, depth,   n, a, i) {
             if (depth > 8) return 0
+            if (is_plumbing(pid)) return 0
             if (is_shell(comm[pid])) return 1
             n = split(kids[pid], a, " ")
             for (i = 1; i <= n; i++) if (a[i] != "" && under_claude(a[i], depth + 1)) return 1
