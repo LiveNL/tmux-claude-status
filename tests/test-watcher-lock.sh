@@ -2,7 +2,7 @@
 # Only one watcher may exist. The pid file is written just after the lock
 # directory is created, so a challenger that reads it too eagerly must wait
 # rather than declare the lock stale and start a second loop.
-HOOKS=/Users/livenl/projects/claude-tmux-hooks/hooks
+HOOKS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks"
 LOCK=/tmp/claude-seed-panes-test.lock
 export CLAUDE_SEED_LOCK="$LOCK"
 rm -rf "$LOCK"

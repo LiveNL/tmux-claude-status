@@ -4,7 +4,7 @@
 # Sharing the user's server meant the seeder watching it would clear the state
 # off panes a test had just set up — the tests failed on a live system and
 # passed on a quiet one, which is the opposite of what they are for.
-HOOKS="${HOOKS:-/Users/livenl/projects/claude-tmux-hooks/hooks}"
+HOOKS="${HOOKS:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks}"
 SOCKET="claudehooks-test-$$"
 
 # -f /dev/null: a fresh server reads ~/.tmux.conf, which starts the seeder and
