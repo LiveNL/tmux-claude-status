@@ -18,9 +18,12 @@ _sid=$(printf %s "$NOTIFIER_INPUT" | sed -n 's/.*"session_id"[[:space:]]*:[[:spa
     printf '%s %s pane=%s tmux=%s sid=%s cwd=%s anc=%s\n' "$(date +%H:%M:%S)" "notify" "${TMUX_PANE:-UNSET}" "${TMUX:+set}" "$_sid" "$PWD" "$_anc" >> /tmp/claude-hook-env.log
 }
 
-MESSAGE=$(echo "$NOTIFIER_INPUT" | jq -r '.message // empty')
-EVENT=$(echo "$NOTIFIER_INPUT" | jq -r '.hook_event_name // empty')
-LAST_MSG=$(echo "$NOTIFIER_INPUT" | jq -r '.last_assistant_message // empty')
+# A payload that will not parse is handled below by clearing the tab; jq's
+# complaint about it would otherwise land in Claude's hook output as an error.
+MESSAGE=$(echo "$NOTIFIER_INPUT" | jq -r '.message // empty' 2>/dev/null)
+EVENT=$(echo "$NOTIFIER_INPUT" | jq -r '.hook_event_name // empty' 2>/dev/null)
+LAST_MSG=$(echo "$NOTIFIER_INPUT" | jq -r '.last_assistant_message // empty' 2>/dev/null)
+TRANSCRIPT=$(echo "$NOTIFIER_INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/state.sh"
 
@@ -80,6 +83,10 @@ set_state() {
 # and killed its spinner. Decide from what the pane was last seen doing.
 awaiting_user() {
     local phase tool beat age
+    # An unanswered question outranks everything below: the latch holds even
+    # when a subagent's tool calls have since overwritten the fingerprint.
+    claude_ask_pending && return 0
+
     # Not running: Stop already had its say, so the event is about an idle
     # session and can be believed.
     [ "$(claude_pane_state)" = "running" ] || return 0
@@ -166,26 +173,38 @@ fi
 
 if [ "$EVENT" = "Stop" ]; then
     claude_mark_activity "stop" ""
+    # The turn is over, so no question of its can still be standing — including
+    # one you escaped out of, which leaves no PostToolUse behind to retire it.
+    claude_clear_ask
     PREVIEW=$(preview "$LAST_MSG")
     # A trailing question mark, or a closing "Next step:" line (house style ends
     # answers that want a decision with one) — both mean the turn awaits input.
     LAST_LINE=$(printf '%s' "$LAST_MSG" | grep -v '^[[:space:]]*$' | tail -1)
     if echo "$LAST_MSG" | grep -q '?$' || printf '%s' "$LAST_LINE" | grep -qiE '^\**Next step:'; then
         set_state "input"
+        claude_set_settled "input"
         if [ "$IS_ACTIVE" != "1" ]; then
             notify_macos "❓ Question" "${PREVIEW:-Claude needs your input}" "Pop"
         fi
     else
         set_state "done"
+        claude_set_settled "done"
         if [ "$IS_ACTIVE" != "1" ]; then
             notify_macos "✅ Done" "${PREVIEW:-Ready for review}" "Glass"
         fi
     fi
+    # Either colour is provisional: a stop hook can hand the turn straight back,
+    # and the transcript is the only thing that says so.
+    claude_watch_continuation "$TRANSCRIPT" "$TMUX_PANE"
 elif [ "$EVENT" = "Notification" ]; then
     if echo "$MESSAGE" | grep -qi "permission"; then
         # PermissionRequest normally paints the tab first, but that event is
         # newer than this one — set it here too so older clients still turn red.
         set_state "permission"
+        # And arm the release. PermissionRequest's watcher is one per pane and
+        # has usually already exited by now; without this the red painted here
+        # was the last word, and the tab stayed red through the whole run.
+        claude_arm_permission_watcher "$TMUX_PANE"
         CMD=$(echo "$MESSAGE" | sed 's/.*[Rr]un[: ]\{1,3\}//' | sed 's/  */ /g; s/^ *//; s/ *$//' | cut -c1-60)
         if [ -n "$CMD" ] && [ "$CMD" != "$MESSAGE" ]; then
             notify_macos "🔑 Permission" "Run: $CMD" "Sosumi"
@@ -199,7 +218,7 @@ elif [ "$EVENT" = "Notification" ]; then
         # or every finished tab quietly turns back into a question mark.
         case "$(claude_pane_state)" in
             permission|done) ;;
-            *) set_state "input" ;;
+            *) set_state "input"; claude_set_settled "input" ;;
         esac
         if [ "$IS_ACTIVE" != "1" ]; then
             notify_macos "💬 Input needed" "${MESSAGE:-Claude needs your attention}" "Pop"

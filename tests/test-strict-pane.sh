@@ -48,6 +48,10 @@ printf '%s' "$stop" | TMUX_PANE="$B" bash "$HOOKS/notify.sh"
 SID=44444444-4444-4444-4444-444444444444
 t set-option -p -t "$A" @claude-session "$SID"
 t set-option -p -u -t "$A" @claude-pane-state
+# Step 4 ended a turn on this pane, and a settled turn holds its colour against
+# everything but the main thread. This row is about where a write lands, so
+# give it a pane with no finished turn behind it.
+t set-option -p -u -t "$A" @claude-pane-settled
 printf '{"hook_event_name":"PreToolUse","session_id":"%s","tool_name":"Bash"}' "$SID" \
     | env -u TMUX_PANE bash "$HOOKS/busy-window.sh"
 check "session id finds the pane when the env cannot" "$(claude_pane_state "$A")" "running"

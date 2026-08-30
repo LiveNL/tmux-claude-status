@@ -32,7 +32,7 @@ done
 bold "1. Installing hooks"
 mkdir -p "$HOOKS_DEST"
 
-for hook in busy-window.sh continue-window.sh notify.sh permission-window.sh reset-window.sh; do
+for hook in busy-window.sh continue-window.sh notify.sh permission-window.sh reset-window.sh end-window.sh; do
     cp "$SCRIPT_DIR/hooks/$hook" "$HOOKS_DEST/$hook"
     chmod +x "$HOOKS_DEST/$hook"
     ok "Installed $HOOKS_DEST/$hook"
@@ -44,7 +44,7 @@ cp "$SCRIPT_DIR/hooks/lib/state.sh" "$HOOKS_DEST/lib/state.sh"
 ok "Installed $HOOKS_DEST/lib/state.sh"
 
 # Seeder — not wired to an event; run from tmux at startup or by hand.
-for tool in seed-panes.sh link-pane.sh; do
+for tool in seed-panes.sh link-pane.sh capture-payloads.sh; do
     cp "$SCRIPT_DIR/hooks/$tool" "$HOOKS_DEST/$tool"
     chmod +x "$HOOKS_DEST/$tool"
     ok "Installed $HOOKS_DEST/$tool"
@@ -58,16 +58,19 @@ HOOKS_FRAGMENT=$(jq -n \
     --arg reset      "bash $HOOKS_DEST/reset-window.sh" \
     --arg notify     "bash $HOOKS_DEST/notify.sh" \
     --arg busy       "bash $HOOKS_DEST/busy-window.sh" \
-    --arg continue   "bash $HOOKS_DEST/continue-window.sh" \
     --arg permission "bash $HOOKS_DEST/permission-window.sh" \
+    --arg end        "bash $HOOKS_DEST/end-window.sh" \
     '{
       hooks: {
         SessionStart:      [{"matcher": "", hooks: [{"type": "command", command: $reset}]}],
+        SessionEnd:        [{"matcher": "", hooks: [{"type": "command", command: $end}]}],
         Notification:      [{"matcher": "", hooks: [{"type": "command", command: $notify}]}],
         Stop:              [{"matcher": "", hooks: [{"type": "command", command: $notify}]}],
         PreToolUse:        [{"matcher": "", hooks: [{"type": "command", command: $busy}]}],
-        PostToolUse:       [{"matcher": "", hooks: [{"type": "command", command: $continue}]}],
+        PostToolUse:       [{"matcher": "", hooks: [{"type": "command", command: $busy}]}],
         UserPromptSubmit:  [{"matcher": "", hooks: [{"type": "command", command: $busy}]}],
+        PreCompact:        [{"matcher": "", hooks: [{"type": "command", command: $busy}]}],
+        PostCompact:       [{"matcher": "", hooks: [{"type": "command", command: $busy}]}],
         PermissionRequest: [{"matcher": "", hooks: [{"type": "command", command: $permission}]}]
       }
     }')

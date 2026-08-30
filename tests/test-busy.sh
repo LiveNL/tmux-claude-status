@@ -49,3 +49,13 @@ check "a question asks, it does not run" "$(TMUX_PANE=$P claude_pane_state)" "in
 
 printf '{"hook_event_name":"PostToolUse","tool_name":"AskUserQuestion"}' | TMUX_PANE="$P" bash "$HOOKS/busy-window.sh"
 check "answering resumes the run" "$(TMUX_PANE=$P claude_pane_state)" "running"
+
+# An event with no tool_name — a prompt, a compaction — must not pick up the
+# next field as its tool. Tab is IFS whitespace, so a tab-separated jq row
+# collapses the empty field and shifts the transcript path into tool_name.
+rm -rf "$LOCK"
+t set-option -p -u -t "$P" @claude-pane-tool
+printf '{"hook_event_name":"UserPromptSubmit","transcript_path":"/tmp/nope.jsonl"}' \
+    | TMUX_PANE="$P" bash "$HOOKS/busy-window.sh"
+check "a prompt records no tool" "$(TMUX_PANE=$P claude_pane_opt @claude-pane-tool)" ""
+check "and is still a prompt" "$(TMUX_PANE=$P claude_pane_opt @claude-pane-phase)" "prompt"

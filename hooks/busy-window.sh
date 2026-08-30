@@ -39,34 +39,74 @@ LOCKDIR="/tmp/claude-spinner-${TMUX_PANE#%}.lock"
 
 event=""
 tool=""
+transcript=""
 if [ -n "$payload" ] && command -v jq >/dev/null 2>&1; then
-    IFS=$'\t' read -r event tool < <(
-        printf '%s' "$payload" | jq -r '[.hook_event_name // "", .tool_name // ""] | @tsv' 2>/dev/null
-    )
+    # The transcript rides along so the spinner can notice an interrupt: Esc
+    # fires no hook of its own, and the transcript is where it lands.
+    #
+    # One field per line, one read each. A tab-separated row cannot be split
+    # safely here: tab is IFS whitespace, so bash collapses the empty tool_name
+    # of a UserPromptSubmit and every field after it shifts left — the pane then
+    # records a transcript path as the tool it is running, and nothing carries
+    # the transcript at all.
+    {
+        IFS= read -r event
+        IFS= read -r tool
+        IFS= read -r transcript
+    } < <(printf '%s' "$payload" \
+            | jq -r '.hook_event_name // "", .tool_name // "", .transcript_path // ""' 2>/dev/null)
 fi
 
 case "$event" in
-    UserPromptSubmit) phase="prompt" ;;
-    PostToolUse)      phase="tool-end" ;;
-    *)                phase="tool-start" ;;
+    UserPromptSubmit)      phase="prompt" ;;
+    PostToolUse)           phase="tool-end" ;;
+    # Compacting is minutes of work with no tool boundary in it. Without a
+    # phase of its own the run looked stalled to notify.sh's staleness check,
+    # which would then believe the next idle notification and go amber mid-run.
+    PreCompact|PostCompact) phase="compact" ;;
+    *)                     phase="tool-start" ;;
 esac
 
 claude_mark_activity "$phase" "$tool"
 
 # Some tools are the waiting. A question or a plan put to you blocks on your
-# answer, and nothing else fires until you give it — the tab used to spin for
-# as long as you took to read it, until the idle notification a minute later
-# finally corrected it. The tool name says so outright.
+# answer — the tab used to spin for as long as you took to read it, until the
+# idle notification a minute later finally corrected it. The tool name says so
+# outright.
+#
+# "Nothing else fires until you answer" turned out to be false: subagents and
+# background commands keep firing hooks against this same pane, and every one
+# of them repainted the tab teal under an unanswered question. So the question
+# sets a latch rather than just a state, and claude_set_state keeps the tab
+# amber until something retires it — the answer, a new prompt, or Stop.
 case "$event:$tool" in
     PreToolUse:AskUserQuestion|PreToolUse:ExitPlanMode)
+        claude_set_ask "$tool"
         claude_set_state "input"
-        want_spinner=""
+        ;;
+    PostToolUse:AskUserQuestion|PostToolUse:ExitPlanMode)
+        # Answering is you, talking to the chat itself — as much a live turn as
+        # typing a prompt — so it releases both holds.
+        claude_clear_ask
+        claude_clear_settled
+        claude_set_state "running"
         ;;
     *)
+        # Typing a prompt starts a turn: it retires a latched question — Esc on
+        # one leaves no PostToolUse behind — and releases the colour the last
+        # turn settled on. Every other event has to take the pane as it finds
+        # it, because it may well be a subagent's and not the chat's at all.
+        if [ "$event" = "UserPromptSubmit" ]; then
+            claude_clear_ask
+            claude_clear_settled
+        fi
         claude_set_state "running"
-        want_spinner=1
         ;;
 esac
+
+# Ask the pane what it ended up as rather than what was requested: a question
+# or a settled turn may have refused the running above, and neither animates.
+[ "$(claude_pane_state)" = "running" ] && want_spinner=1
 
 # A prompt or tool call is proof the conversation resumed, so release an
 # auto-park right here — the Claude TUI runs on the alternate screen, where
@@ -92,7 +132,7 @@ if [ -x "$PARK" ]; then
     fi
 fi
 
-[ -n "$want_spinner" ] && claude_start_spinner "$TMUX_PANE"
+[ -n "$want_spinner" ] && claude_start_spinner "$TMUX_PANE" "$transcript"
 
 exit 0
 

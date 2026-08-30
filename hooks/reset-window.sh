@@ -29,6 +29,15 @@ fi
 # Only this pane is touched. A sibling pane running its own session keeps its
 # state, and the window indicator falls back to whichever is more urgent.
 claude_mark_activity "session-start" ""
+# A new session owes nothing to the old one: no question of its is outstanding,
+# and no turn of its is still holding a colour.
+claude_clear_ask
+claude_clear_settled
 claude_set_state "input"
-tmux set-option -w -t "$TMUX_PANE" @claude-spinner "⬢"
-tmux refresh-client -S
+tmux set-option -w -t "$TMUX_PANE" @claude-spinner "⬢" 2>/dev/null
+# A server with no attached client answers "no current client" on stderr and
+# exits non-zero. Claude reports a hook that exits non-zero, so the last word
+# here has to be a success either way.
+tmux refresh-client -S 2>/dev/null
+
+exit 0
