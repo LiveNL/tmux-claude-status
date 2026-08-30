@@ -2,7 +2,11 @@
 # Only one watcher may exist. The pid file is written just after the lock
 # directory is created, so a challenger that reads it too eagerly must wait
 # rather than declare the lock stale and start a second loop.
-HOOKS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks"
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# The seeder refuses to start without a server to watch — CI has none on the
+# default socket, so hand it the throwaway one.
+test_server_start
+trap test_server_stop EXIT
 LOCK=/tmp/claude-seed-panes-test.lock
 export CLAUDE_SEED_LOCK="$LOCK"
 rm -rf "$LOCK"
