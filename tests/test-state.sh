@@ -44,7 +44,7 @@ check "dead pane leaves no state" ""
 
 echo "-- activity fingerprint --"
 TMUX_PANE="$B" claude_mark_activity tool-start AskUserQuestion
-TMUX_PANE="$B" bash -c 'source /Users/livenl/projects/claude-tmux-hooks/hooks/lib/state.sh
+TMUX_PANE="$B" HOOKS="$HOOKS" bash -c 'source "$HOOKS/lib/state.sh"
   printf "phase=%s tool=%s beat=%s\n" "$(claude_pane_opt @claude-pane-phase)" \
     "$(claude_pane_opt @claude-pane-tool)" "$(claude_pane_opt @claude-pane-beat)"'
 
