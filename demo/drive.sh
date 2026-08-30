@@ -1,10 +1,10 @@
 #!/bin/bash
-# Stage the demo GIF: a real tmux server running the shipped status format,
-# with a driver flipping window states on a timeline the way live hooks would.
-# No Claude session is involved — the recording is about the tab bar, and the
+# Stage the demo GIF: a real tmux server running the state format, with a
+# driver flipping window states on a timeline the way live hooks would. No
+# Claude session is involved — the recording is about the tab bar, and the
 # states are set through the same options the hooks write.
 #
-#   demo/drive.sh up      build the session on socket "demo" and start the driver
+#   demo/drive.sh up      build the session on socket "claude-demo" and start the driver
 #   demo/drive.sh down    tear it all down
 #
 # Record with vhs (brew install vhs):  vhs demo/demo.tape
@@ -15,30 +15,24 @@ SOCKET=claude-demo
 
 t() { command tmux -L "$SOCKET" "$@"; }
 
+# The pane never shows a shell: each window runs a printer that draws its
+# content and sleeps, so no prompt and no cursor ends up in the recording.
+LEGEND='clear; tput civis; printf "\n\n   \033[2mfour Claude Code sessions — the tab bar tracks each one\033[0m\n\n   \033[1;34m⬢ working\033[0m    \033[1;33m? waiting on you\033[0m    \033[1;31m! permission\033[0m    \033[32m✓ done\033[0m\n"; sleep 600'
+BLANK='clear; tput civis; sleep 600'
+API='clear; tput civis; printf "\n\n   \033[32m✓\033[0m \033[2mapi — turn finished, answer waiting in the transcript\033[0m\n"; sleep 600'
+
 up() {
     t kill-server 2>/dev/null
-    t -f /dev/null new-session -d -s work -n api -x 120 -y 18
-    t source-file "$ROOT/tmux/claude-state.conf"
-
-    # A quiet bar: the windows are the whole story.
-    t set -g status-style "bg=colour235,fg=colour244"
-    t set -g status-left "  #S  "
-    t set -g status-left-style "bg=colour235,fg=colour109"
-    t set -g status-right "  "
-    t set -g window-status-separator " "
+    t -f /dev/null new-session -d -s work -n api -x 130 -y 12 "sh -c '$API'"
+    t source-file "$ROOT/demo/theme.conf"
+    t set -g base-index 1
     t set -g mouse off
 
-    t new-window -t work -n frontend
-    t new-window -t work -n infra
-    t new-window -t work -n docs
-
-    local w
-    for w in api frontend infra docs; do
-        t send-keys -t "work:$w" "clear" Enter
-    done
-    t send-keys -t "work:docs" \
-        "clear; printf '\n\n   \033[2mfour Claude sessions, one tab bar — watch below\033[0m\n'" Enter
-    t select-window -t work:docs
+    t new-window -t work -n frontend "sh -c '$BLANK'"
+    t new-window -t work -n infra "sh -c '$BLANK'"
+    t new-window -t work -n notes "sh -c '$LEGEND'"
+    t move-window -r -t work
+    t select-window -t work:notes
 
     ( driver ) >/dev/null 2>&1 &
     disown 2>/dev/null
