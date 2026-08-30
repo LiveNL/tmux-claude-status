@@ -1,0 +1,21 @@
+# Which payload fields these hooks actually read, and on which events they must
+# be there.
+#
+# The event list in hooks/events.txt guards against Claude adding or removing an
+# event. This file guards one level down: a field that gets renamed inside a
+# payload. Handwritten test JSON cannot catch that — it would keep using the old
+# name and stay green while the tab quietly stopped working — so
+# tests/test-payload-contract.sh checks this against payloads captured from a
+# real session (hooks/capture-payloads.sh on).
+#
+# Columns: field, the script that reads it, the events that must carry it
+# ("*" = every event that script is wired to).
+
+session_id             lib/state.sh          *
+hook_event_name        busy-window.sh        PreToolUse,PostToolUse,UserPromptSubmit,PreCompact,PostCompact
+tool_name              busy-window.sh        PreToolUse,PostToolUse
+transcript_path        busy-window.sh        PreToolUse,PostToolUse,UserPromptSubmit
+hook_event_name        notify.sh             Stop,Notification
+transcript_path        notify.sh             Stop
+last_assistant_message notify.sh             Stop
+message                notify.sh             Notification

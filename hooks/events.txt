@@ -1,0 +1,19 @@
+# The contract between Claude Code's hook events and this repo.
+#
+# Columns: event, hook script ("-" = deliberately unhandled), why.
+# tests/test-hook-coverage.sh reads this file and fails when it drifts from
+# install.sh, from the scripts on disk, or from the events Claude Code emits —
+# so a new event in a Claude release shows up as a failing test rather than as
+# a tab that quietly stops telling the truth.
+
+SessionStart       reset-window.sh       a fresh session is waiting on you
+SessionEnd         end-window.sh         nothing is running any more, clear the tab
+UserPromptSubmit   busy-window.sh        you started a turn
+PreToolUse         busy-window.sh        work starting (a question is the exception)
+PostToolUse        busy-window.sh        work finished, or a question was answered
+PreCompact         busy-window.sh        compacting is work with no tool boundary in it
+PostCompact        busy-window.sh        same, and it says the run is still moving
+PermissionRequest  permission-window.sh  the dialog is up, and someone must clear it
+Notification       notify.sh             permission, or "still waiting on you"
+Stop               notify.sh             the turn ended — provisionally
+SubagentStop       -                     a subagent finishing is not the chat finishing

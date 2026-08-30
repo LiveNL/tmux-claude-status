@@ -1,0 +1,15 @@
+{
+  "session_id": "«redacted»",
+  "transcript_path": "«redacted»",
+  "cwd": "«redacted»",
+  "prompt_id": "«redacted»",
+  "permission_mode": "«redacted»",
+  "effort": {
+    "level": "«redacted»"
+  },
+  "hook_event_name": "Stop",
+  "stop_hook_active": false,
+  "last_assistant_message": "«redacted»",
+  "background_tasks": [],
+  "session_crons": []
+}

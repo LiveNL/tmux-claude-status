@@ -1,0 +1,30 @@
+{
+  "session_id": "«redacted»",
+  "transcript_path": "«redacted»",
+  "cwd": "«redacted»",
+  "prompt_id": "«redacted»",
+  "permission_mode": "«redacted»",
+  "hook_event_name": "PermissionRequest",
+  "tool_name": "«redacted»",
+  "tool_input": {
+    "command": "«redacted»",
+    "description": "«redacted»"
+  },
+  "permission_suggestions": [
+    {
+      "type": "«redacted»",
+      "rules": [
+        {
+          "toolName": "«redacted»",
+          "ruleContent": "«redacted»"
+        },
+        {
+          "toolName": "«redacted»",
+          "ruleContent": "«redacted»"
+        }
+      ],
+      "behavior": "«redacted»",
+      "destination": "«redacted»"
+    }
+  ]
+}

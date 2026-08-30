@@ -1,0 +1,25 @@
+{
+  "session_id": "«redacted»",
+  "transcript_path": "«redacted»",
+  "cwd": "«redacted»",
+  "prompt_id": "«redacted»",
+  "permission_mode": "«redacted»",
+  "effort": {
+    "level": "«redacted»"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "«redacted»",
+  "tool_input": {
+    "command": "«redacted»",
+    "description": "«redacted»"
+  },
+  "tool_response": {
+    "stdout": "«redacted»",
+    "stderr": "«redacted»",
+    "interrupted": false,
+    "isImage": false,
+    "noOutputExpected": false
+  },
+  "tool_use_id": "«redacted»",
+  "duration_ms": 27
+}

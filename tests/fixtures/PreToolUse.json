@@ -1,0 +1,17 @@
+{
+  "session_id": "«redacted»",
+  "transcript_path": "«redacted»",
+  "cwd": "«redacted»",
+  "prompt_id": "«redacted»",
+  "permission_mode": "«redacted»",
+  "effort": {
+    "level": "«redacted»"
+  },
+  "hook_event_name": "PreToolUse",
+  "tool_name": "«redacted»",
+  "tool_input": {
+    "file_path": "«redacted»",
+    "content": "«redacted»"
+  },
+  "tool_use_id": "«redacted»"
+}
