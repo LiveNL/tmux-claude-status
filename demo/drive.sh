@@ -15,11 +15,12 @@ SOCKET=claude-demo
 
 t() { command tmux -L "$SOCKET" "$@"; }
 
-# The pane never shows a shell: each window runs a printer that draws its
-# content and sleeps, so no prompt and no cursor ends up in the recording.
-LEGEND='clear; tput civis; printf "\n\n   \033[2mfour Claude Code sessions — the tab bar tracks each one\033[0m\n\n   \033[1;34m⬢ working\033[0m    \033[1;33m? waiting on you\033[0m    \033[1;31m! permission\033[0m    \033[32m✓ done\033[0m\n"; sleep 600'
-BLANK='clear; tput civis; sleep 600'
-API='clear; tput civis; printf "\n\n   \033[32m✓\033[0m \033[2mapi — turn finished, answer waiting in the transcript\033[0m\n"; sleep 600'
+# The pane never shows a shell: each window runs a printer that draws a quiet
+# mock of a session and sleeps, so no live prompt or cursor ends up in the
+# recording. The README's states table is the legend; the panes just have to
+# look like what they are — terminals hosting Claude sessions.
+SESSION='clear; tput civis; printf "\n \033[2m❯\033[0m claude\n\n \033[2m⏺ working…\033[0m\n"; sleep 600'
+API='clear; tput civis; printf "\n \033[2m❯\033[0m claude\n\n \033[32m✓\033[0m \033[2mturn finished — answer waiting in this window\033[0m\n"; sleep 600'
 
 up() {
     t kill-server 2>/dev/null
@@ -28,9 +29,9 @@ up() {
     t set -g base-index 1
     t set -g mouse off
 
-    t new-window -t work -n frontend "sh -c '$BLANK'"
-    t new-window -t work -n infra "sh -c '$BLANK'"
-    t new-window -t work -n notes "sh -c '$LEGEND'"
+    t new-window -t work -n frontend "sh -c '$SESSION'"
+    t new-window -t work -n infra "sh -c '$SESSION'"
+    t new-window -t work -n notes "sh -c '$SESSION'"
     t move-window -r -t work
     t select-window -t work:notes
 
