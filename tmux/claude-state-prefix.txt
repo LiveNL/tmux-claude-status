@@ -1,4 +1,4 @@
-# claude-tmux-hooks: state prefix fragment
+# tmux-claude-status: state prefix fragment
 #
 # Use this if you already have a custom window-status-format and want to
 # embed the Claude indicator into it rather than replacing your format.

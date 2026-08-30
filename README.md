@@ -1,15 +1,17 @@
-# claude-tmux-hooks
+# tmux-claude-status
 
-Per-window Claude Code status in your tmux tab bar — animated indicator, event-driven, zero polling.
+Every Claude Code session's state, live in your tmux tab bar — a spinner while it works, amber when it asks, red when it's blocked on an approval, green when it's done.
 
-![Demo: Claude state cycling through running → permission → input → done across three tmux windows](screenshots/demo.gif)
+[![tests](https://github.com/LiveNL/tmux-claude-status/actions/workflows/tests.yml/badge.svg)](https://github.com/LiveNL/tmux-claude-status/actions/workflows/tests.yml)
 
-Open five Claude sessions in five windows. Each tab tracks its own state, live:
+![Demo: Claude state cycling through running → permission → input → done across four tmux windows](screenshots/demo.gif)
+
+Run five Claude sessions in five windows and you spend your day guessing which tab wants you. This makes the bar answer it at a glance:
 
 | State | Glyph | Color | When |
 |-------|-------|-------|------|
-| running | `⬢` *(animates)* | cyan | Claude is executing a tool |
-| input | `?` | amber | Claude is waiting for your reply |
+| running | `⬢` *(animates)* | cyan | Claude is working |
+| input | `?` | amber | Claude is waiting on your reply |
 | permission | `!` | red | Claude needs approval to run a command |
 | done | `✓` | green | Claude finished without a question |
 | *(idle)* | — | dim | No active Claude session |
@@ -27,11 +29,21 @@ On macOS you also get desktop notifications:
 
 **No polling. No cron. No background daemons.** State changes are triggered by [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) at the exact moment each lifecycle event fires.
 
+## Why it stays truthful
+
+The tab tracks where your attention is owed, not what a CPU happens to be doing — and those differ more often than you'd think:
+
+- **Subagents don't repaint your tab.** An unanswered question holds amber and a finished turn holds its color, even while background agents keep firing tool events against the same pane.
+- **Silent transitions are caught.** Pressing Esc fires no hook; neither does granting a permission; and a stop hook can hand a "finished" turn straight back. Each has a watcher, so the tab follows what actually happened.
+- **A pane is only ever painted with certainty.** Hooks that can't name their pane are dropped rather than guessed — a daemon-hosted agent can never drive a tab it doesn't own.
+
+The whole state machine is pinned by 260+ assertions across 18 suites, including a payload contract checked against fixtures captured from real Claude sessions — a Claude release that renames an event or a field shows up as a failing test, not as a tab that quietly stops telling the truth.
+
 ## Install
 
 ```bash
-git clone https://github.com/LiveNL/claude-tmux-hooks
-cd claude-tmux-hooks
+git clone https://github.com/LiveNL/tmux-claude-status
+cd tmux-claude-status
 bash install.sh
 ```
 
@@ -65,7 +77,7 @@ tmux source-file ~/.tmux.conf
 **Option A — drop-in** (replaces `window-status-format` with a clean minimal style):
 
 ```tmux
-source-file /path/to/claude-tmux-hooks/tmux/claude-state.conf
+source-file /path/to/tmux-claude-status/tmux/claude-state.conf
 ```
 
 **Option B — embed in your existing theme** (keeps your current format, prepends the indicator):
@@ -124,7 +136,7 @@ The animated spinner is a lightweight background process that writes a new frame
 
 **Debug logging:** Set `DEBUG_CLAUDE_HOOKS=1` to log hook decisions to `/tmp/claude-notify.log`. Separately, `touch /tmp/claude-hook-env.log` makes every hook record the pane and ancestry it was fired with — that is how sessions firing without a pane were found. Delete the file to switch it off.
 
-**Tests:** `bash tests/run-all.sh` runs each suite against its own throwaway tmux server. Three of them are the safety net for changing any of this:
+**Tests:** `bash tests/run-all.sh` runs each suite against its own throwaway tmux server; CI runs them all on every push. Three of them are the safety net for changing any of this:
 
 | Suite | Asserts |
 |---|---|
@@ -134,6 +146,8 @@ The animated spinner is a lightweight background process that writes a new frame
 | `test-payload-contract.sh` | the payload fields the hooks read are present in payloads Claude really sent |
 
 The last one closes the gap the others cannot: every suite feeds these hooks JSON written by hand, which would keep using a field name after Claude renamed it and stay green while the tab quietly stopped working. `hooks/capture-payloads.sh on` records one real payload per event into `tests/fixtures/` — redacted to key names, since a live payload carries the command that ran and the reply that was written — and `hooks/payload-contract.txt` says which fields must be in each. Recapture after a Claude upgrade; the suite says which version the fixtures came from.
+
+**Demo GIF:** `screenshots/demo.gif` is recorded with [vhs](https://github.com/charmbracelet/vhs) — `vhs demo/demo.tape` re-renders it; `demo/drive.sh` stages a tmux server and drives the states the way live hooks would.
 
 ## Uninstall
 
