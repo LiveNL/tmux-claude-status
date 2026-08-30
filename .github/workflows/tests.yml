@@ -1,0 +1,18 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tmux and jq
+        run: sudo apt-get update && sudo apt-get install -y tmux jq
+      - name: Run the suite
+        # Each suite brings up its own throwaway tmux server, so nothing here
+        # needs a terminal. The Claude-binary cross-check in test-hook-coverage
+        # skips itself when there is no CLI installed and says so.
+        run: bash tests/run-all.sh
