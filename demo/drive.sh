@@ -15,16 +15,15 @@ SOCKET=claude-demo
 
 t() { command tmux -L "$SOCKET" "$@"; }
 
-# The pane never shows a shell: each window runs a printer that draws a quiet
-# mock of a session and sleeps, so no live prompt or cursor ends up in the
-# recording. The README's states table is the legend; the panes just have to
-# look like what they are — terminals hosting Claude sessions.
+# The panes never show a live shell. The visible window (api) plays the
+# screenplay in pane-script.sh — a mock Claude chat whose beats the driver
+# mirrors on the tab — and the background windows hold a quiet one-line mock
+# so their tabs have something plausible behind them.
 SESSION='clear; tput civis; printf "\n \033[2m❯\033[0m claude\n\n \033[2m⏺ working…\033[0m\n"; sleep 600'
-API='clear; tput civis; printf "\n \033[2m❯\033[0m claude\n\n \033[32m✓\033[0m \033[2mturn finished — answer waiting in this window\033[0m\n"; sleep 600'
 
 up() {
     t kill-server 2>/dev/null
-    t -f /dev/null new-session -d -s work -n api -x 130 -y 12 "sh -c '$API'"
+    t -f /dev/null new-session -d -s work -n api -x 130 -y 14 "bash '$ROOT/demo/pane-script.sh'"
     t source-file "$ROOT/demo/theme.conf"
     t set -g base-index 1
     t set -g mouse off
@@ -33,7 +32,7 @@ up() {
     t new-window -t work -n infra "sh -c '$SESSION'"
     t new-window -t work -n notes "sh -c '$SESSION'"
     t move-window -r -t work
-    t select-window -t work:notes
+    t select-window -t work:api
 
     ( driver ) >/dev/null 2>&1 &
     disown 2>/dev/null
@@ -50,15 +49,15 @@ driver() {
     # timeline flips states at fixed ticks, ending on a bar that shows all four.
     local -a running=()
     for tick in $(seq 0 40); do
+        # Mirrors pane-script.sh: the chat on screen causes each flip below.
         case "$tick" in
-            1)  state api running; running=(api) ;;
-            5)  state frontend running; running=(api frontend) ;;
-            9)  state api permission; running=(frontend) ;;     # api wants approval
-            15) state infra input; refresh ;;                   # infra asked a question
-            19) state api running; running=(api frontend) ;;    # approval given
-            25) state frontend done; running=(api) ;;           # frontend finished
-            31) state api done; running=() ;;                   # api finished
-            33) t select-window -t work:api ;;                  # you go read it
+            1)  state api running; running=(api) ;;             # npm test starts
+            3)  state frontend running; running=(api frontend) ;;
+            9)  state api permission; running=(frontend) ;;     # the dialog on screen
+            15) state infra input; refresh ;;                   # another window asks
+            19) state api running; running=(api frontend) ;;    # "1" approved it
+            25) state frontend done; running=(api) ;;
+            31) state api input; running=() ;;                  # the closing question
             39) break ;;
         esac
         frame=$(( 1 - frame ))
