@@ -1,20 +1,32 @@
 # tmux-claude-status
 
-Every Claude Code session's state, live in your tmux tab bar — a spinner while it works, amber when it asks, red when it's blocked on an approval, green when it's done.
-
 [![tests](https://github.com/LiveNL/tmux-claude-status/actions/workflows/tests.yml/badge.svg)](https://github.com/LiveNL/tmux-claude-status/actions/workflows/tests.yml)
 
-![Demo: Claude state cycling through running → permission → input → done across four tmux windows](screenshots/demo.gif)
+![tmux-claude-status — every Claude Code session's state, live in your tmux tab bar](screenshots/cover.png)
 
-Run five Claude sessions in five windows and you spend your day guessing which tab wants you. This makes the bar answer it at a glance:
+Run five Claude sessions in five windows and you spend your day guessing which tab wants you. This makes the bar answer it at a glance.
 
-| State | Glyph | Color | When |
-|-------|-------|-------|------|
-| running | `⬢` *(animates)* | cyan | Claude is working |
-| input | `?` | amber | Claude is waiting on your reply |
-| permission | `!` | red | Claude needs approval to run a command |
-| done | `✓` | green | Claude finished without a question |
-| *(idle)* | — | dim | No active Claude session |
+## The states
+
+**running** — the spinner ticks while Claude works
+
+![running](screenshots/state-running.gif)
+
+**input** — Claude asked you something and waits, amber `?`
+
+![input](screenshots/state-input.gif)
+
+**permission** — blocked on an approval, red `!`
+
+![permission](screenshots/state-permission.gif)
+
+**done** — finished without a question, green `✓`
+
+![done](screenshots/state-done.gif)
+
+## The workflow
+
+![The workflow: a red ! calls you over, you approve, and every other state arrives while you keep working](screenshots/demo.gif)
 
 **No polling. No cron. No daemons.** [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) fire at each lifecycle event; the tab is repainted at that exact moment. Questions latch, finished turns hold their colour, and the transitions Claude never reports — Esc, a granted permission, a stop hook resuming the turn — are caught by watchers. Subagents can't repaint a tab that's waiting on you. The whole state machine is pinned by 260+ assertions run in CI, including a payload contract checked against captured real Claude payloads.
 

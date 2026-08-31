@@ -63,6 +63,14 @@ The last one closes the gap the others cannot: every suite feeds these hooks JSO
 
 Set `DEBUG_CLAUDE_HOOKS=1` to log hook decisions to `/tmp/claude-notify.log`. Separately, `touch /tmp/claude-hook-env.log` makes every hook record the pane and ancestry it was fired with — that is how sessions firing without a pane were found. Delete the file to switch it off.
 
-## Demo GIF
+## Demo assets
 
-`screenshots/demo.gif` is recorded with [vhs](https://github.com/charmbracelet/vhs) — `vhs demo/demo.tape` re-renders it; `demo/drive.sh` stages a tmux server and drives the states the way live hooks would, styled by `demo/theme.conf`.
+All README visuals are generated with [vhs](https://github.com/charmbracelet/vhs) plus a Python post-pass; `demo/drive.sh` stages a tmux server and drives the states the way live hooks would, styled by `demo/theme.conf`:
+
+```bash
+python3 demo/cover.py                              # screenshots/cover.png (drawn, no recording)
+vhs demo/minis.tape && python3 demo/minis.py       # screenshots/state-*.gif (per-state clips)
+vhs demo/demo.tape  && python3 demo/captions.py    # screenshots/demo.gif (workflow, captioned)
+```
+
+`minis.py` cuts the four state clips on the idle gaps the driver leaves between them, and `captions.py` calibrates its caption timing off the first permission-red frame — neither trusts a clock.
