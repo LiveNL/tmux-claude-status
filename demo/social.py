@@ -32,9 +32,9 @@ def main():
     im = Image.new("RGB", (W, H), BG)
     d = ImageDraw.Draw(im)
 
-    d.text((72, 128), "tmux-claude-status-tabs", font=menlo(54), fill=FG)
-    d.text((75, 216), "every Claude Code session's state,", font=menlo(26, index=0), fill=DIM)
-    d.text((75, 254), "live in your tmux tab bar", font=menlo(26, index=0), fill=DIM)
+    d.text((72, 132), "tmux-claude-status-tabs", font=menlo(44), fill=FG)
+    d.text((74, 208), "every Claude Code session's state,", font=menlo(25, index=0), fill=DIM)
+    d.text((74, 246), "live in your tmux tab bar", font=menlo(25, index=0), fill=DIM)
 
     rows = [("hex", TEAL, "working"), ("?", AMBER, "waiting on you"),
             ("!", RED, "needs permission"), ("✓", GREEN, "done")]
@@ -48,11 +48,13 @@ def main():
         d.text((x_t, y + 4), label, font=f_t, fill=col)
         y += 82
 
+    # Tight crop around the bar's content, then a single uniform scale — a
+    # non-uniform stretch here reads as broken text.
     src = Image.open(RAW)
     frames = list(ImageSequence.Iterator(src))
-    strip = frames[len(frames) // 2].convert("RGB").crop((0, 196, 1250, 258))
+    strip = frames[len(frames) // 2].convert("RGB").crop((0, 194, 940, 258))
     strip = ImageEnhance.Color(strip).enhance(1.15)
-    sh = int(strip.height * W / strip.width * 1.35)
+    sh = int(strip.height * W / strip.width)
     im.paste(strip.resize((W, sh), Image.LANCZOS), (0, H - sh))
     d.rectangle((0, H - sh - 3, W, H - sh), fill=(45, 66, 68))
 
