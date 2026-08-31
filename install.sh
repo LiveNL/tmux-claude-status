@@ -17,7 +17,7 @@ bold() { echo -e "${BOLD}$*${R}"; }
 
 # ── Preflight ──────────────────────────────────────────────────────────────
 
-bold "\ntmux-claude-status installer"
+bold "\ntmux-claude-status-tabs installer"
 echo ""
 
 for dep in tmux jq; do

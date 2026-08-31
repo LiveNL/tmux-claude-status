@@ -32,7 +32,7 @@ def main():
     im = Image.new("RGB", (W, H), BG)
     d = ImageDraw.Draw(im)
 
-    d.text((72, 128), "tmux-claude-status", font=menlo(54), fill=FG)
+    d.text((72, 128), "tmux-claude-status-tabs", font=menlo(54), fill=FG)
     d.text((75, 216), "every Claude Code session's state,", font=menlo(26, index=0), fill=DIM)
     d.text((75, 254), "live in your tmux tab bar", font=menlo(26, index=0), fill=DIM)
 

@@ -1,8 +1,8 @@
-# tmux-claude-status
+# tmux-claude-status-tabs
 
-[![tests](https://github.com/LiveNL/tmux-claude-status/actions/workflows/tests.yml/badge.svg)](https://github.com/LiveNL/tmux-claude-status/actions/workflows/tests.yml)
+[![tests](https://github.com/LiveNL/tmux-claude-status-tabs/actions/workflows/tests.yml/badge.svg)](https://github.com/LiveNL/tmux-claude-status-tabs/actions/workflows/tests.yml)
 
-![tmux-claude-status — every Claude Code session's state, live in your tmux tab bar](screenshots/cover.png)
+![tmux-claude-status-tabs — every Claude Code session's state, live in your tmux tab bar](screenshots/cover.png)
 
 Run five Claude sessions in five windows and you spend your day guessing which tab wants you. This makes the bar answer it at a glance.
 
@@ -35,8 +35,8 @@ Curious why the tab never lies? Read [how it works](docs/how-it-works.md).
 ## Install
 
 ```bash
-git clone https://github.com/LiveNL/tmux-claude-status
-cd tmux-claude-status
+git clone https://github.com/LiveNL/tmux-claude-status-tabs
+cd tmux-claude-status-tabs
 bash install.sh
 ```
 
@@ -46,7 +46,7 @@ Requires [tmux](https://github.com/tmux/tmux) ≥ 3.0, [jq](https://stedolan.git
 
 Then add **one** of these to `~/.tmux.conf` and reload:
 
-- **Drop-in:** `source-file /path/to/tmux-claude-status/tmux/claude-state.conf`
+- **Drop-in:** `source-file /path/to/tmux-claude-status-tabs/tmux/claude-state.conf`
 - **Your own theme:** prepend the `#{?...}` fragment from `tmux/claude-state-prefix.txt` to your existing `window-status-format` and `window-status-current-format`.
 
 ## Desktop notifications (macOS)

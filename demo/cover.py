@@ -23,7 +23,7 @@ def main():
     frames = list(ImageSequence.Iterator(src))
     im = frames[len(frames) // 2].convert("RGB")
     draw = ImageDraw.Draw(im)
-    draw.text((48, 74), "tmux-claude-status", font=font(44), fill=(230, 237, 237))
+    draw.text((48, 74), "tmux-claude-status-tabs", font=font(44), fill=(230, 237, 237))
     draw.text((50, 136), "every Claude Code session's state, live in your tmux tab bar",
               font=font(21, index=0), fill=(120, 158, 158))
     im.save(PNG)
