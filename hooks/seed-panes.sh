@@ -68,9 +68,18 @@ if [ -n "$WATCH" ]; then
     echo $$ > "$LOCK/pid"
 
     self=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")
+    # The reconciler rides in this loop rather than running its own daemon:
+    # seeding discovers sessions every INTERVAL, verification against Claude's
+    # session files runs every few seconds in between.
+    recon=$(dirname "$self")/reconcile-panes.sh
     while :; do
         bash "$self" >/dev/null 2>&1
-        sleep "$INTERVAL"
+        elapsed=0
+        while [ "$elapsed" -lt "$INTERVAL" ]; do
+            [ -f "$recon" ] && bash "$recon" >/dev/null 2>&1
+            sleep 3
+            elapsed=$(( elapsed + 3 ))
+        done
     done
 fi
 

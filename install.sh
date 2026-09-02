@@ -43,8 +43,8 @@ mkdir -p "$HOOKS_DEST/lib"
 cp "$SCRIPT_DIR/hooks/lib/state.sh" "$HOOKS_DEST/lib/state.sh"
 ok "Installed $HOOKS_DEST/lib/state.sh"
 
-# Seeder — not wired to an event; run from tmux at startup or by hand.
-for tool in seed-panes.sh link-pane.sh capture-payloads.sh; do
+# Seeder and reconciler — not wired to an event; run from tmux at startup or by hand.
+for tool in seed-panes.sh link-pane.sh capture-payloads.sh reconcile-panes.sh; do
     cp "$SCRIPT_DIR/hooks/$tool" "$HOOKS_DEST/$tool"
     chmod +x "$HOOKS_DEST/$tool"
     ok "Installed $HOOKS_DEST/$tool"

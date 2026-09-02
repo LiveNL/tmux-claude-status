@@ -42,6 +42,14 @@ That leaves two gaps hooks cannot fill, both answered from the process table rat
 
 One case cannot be linked from outside. A conversation started with no arguments can end up hosted inside Claude's daemon, with the pane holding only a client attached to it; the session id then appears in no process argument, environment or open file that a pane can be matched against. `seed-panes.sh` names those panes as `unlinked` — their tab still shows that a session is present, but it cannot follow what that session is doing. Starting the conversation in the pane (as `claude --resume <id>` does) is what makes its hooks carry the pane.
 
+## The verifier
+
+Hooks paint first, but some windows contain no event at all: a stop-hook chain (measured: 32 seconds of transcript silence), a continuation resumed by a stop hook, subagents working under a finished turn, an Esc that fires nothing. Rather than one watcher per gap, `hooks/reconcile-panes.sh` verifies every tab a few seconds apart against Claude Code's own account: `~/.claude/sessions/<pid>.json`, which the CLI maintains per live session with a `status` of `busy` | `waiting` | `idle` and the tmux pane it runs in.
+
+Measured over an 11-hour working day before building it: tabs wore a finished colour for 35 minutes total while the session file said `busy` (one stretch of 203 seconds), and `waiting` coincided with an open permission dialog to within seconds. The division of labour stays: hooks are fast (~0.5s) and carry the meaning Claude does not track — a question and a finished turn are both `idle` to Claude — so the verifier only corrects drift: `busy` over a settled tab returns it to running, `waiting` paints permission, `idle` under a spinning tab retires it to input. Fresh edges on either side get a grace period, and an unanswered question outranks `busy`.
+
+The session file is internal and undocumented, so `tests/test-session-contract.sh` pins the four fields the verifier reads — a Claude release that changes the shape fails the suite instead of silently ending verification. The verifier rides inside `seed-panes.sh --watch`'s loop; no extra daemon.
+
 ## The spinner
 
 The animated spinner is a lightweight background process that writes a new frame to `@claude-spinner` twice a second and exits the moment the pane leaves `running`. One spinner per pane is guaranteed by an atomic lock directory; it gives up after four hours and clears the state, so a crashed session can't strand a half-lit glyph on the tab.

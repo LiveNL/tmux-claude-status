@@ -28,7 +28,7 @@ Run five Claude sessions in five windows and you spend your day guessing which t
 
 ![The workflow: a red ! calls you over, you approve, and every other state arrives while you keep working](screenshots/demo.gif)
 
-**No polling. No cron. No daemons.** [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) fire at each lifecycle event; the tab is repainted at that exact moment. Questions latch, finished turns hold their colour, and the transitions Claude never reports — Esc, a granted permission, a stop hook resuming the turn — are caught by watchers. Subagents can't repaint a tab that's waiting on you. The whole state machine is pinned by 260+ assertions run in CI, including a payload contract checked against captured real Claude payloads.
+**Event-driven, continuously verified.** [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) repaint the tab within half a second of each lifecycle event, and a verifier checks every tab against Claude Code's own per-session status a few seconds apart — so even the transitions Claude never reports (Esc, a granted permission, a stop hook resuming the turn, subagents working under a finished turn) can't leave a tab lying. Questions latch, finished turns hold their colour. The whole state machine is pinned by 300+ assertions run in CI, including contract tests against real Claude payloads and session files.
 
 Curious why the tab never lies? Read [how it works](docs/how-it-works.md).
 
